@@ -1,8 +1,8 @@
 /***********************************************
  * file       : list.c
  * description: the implement to LinkList
- * author	  : lamar
- * date		  : 2018/04/07
+ * author     : lamar
+ * date       : 2018/04/07
  *************/
 
 #include"list.h"
@@ -10,35 +10,35 @@
 
 int insert( ListNode **ppHead, ElemType eVal, int location )
 {
-	int i;
-	ListNode *p, *buf;
+    int i;
+    ListNode *p, *buf;
 
-	i = 1;
-	p = *ppHead;
+    i = 1;
+    p = *ppHead;
 
-	/* 查找要插入的位置 */
-	while( p && (i < location) )
-	{
-		p = p->m_pNext;
-		i++;
-	}
+    /* 查找要插入的位置 */
+    while( p && (i < location) )
+    {
+        p = p->m_pNext;
+        i++;
+    }
 
-	/* 元素不存在 */
-	if( !p || (i > location) )
-	{
-		printf("the element is inexistence \n");
+    /* 元素不存在 */
+    if( !p || (i > location) )
+    {
+        printf("the element is inexistence \n");
 
-		return ERROR;
-	}
+        return ERROR;
+    }
 
-	/* 插入操作 */
-	buf = (ListNode*)malloc( sizeof(ListNode) );
+    /* 插入操作 */
+    buf = (ListNode*)malloc( sizeof(ListNode) );
 
-	buf->m_eVal     = eVal;
-	buf->m_pNext    = p->m_pNext;
-	p->m_pNext		= buf;
+    buf->m_eVal     = eVal;
+    buf->m_pNext    = p->m_pNext;
+    p->m_pNext		= buf;
 
-	return OK;
+    return OK;
 }
 
 int addToTail( ListNode **ppHead, ElemType eVal )
@@ -50,7 +50,7 @@ int addToTail( ListNode **ppHead, ElemType eVal )
     if ( *ppHead == NULL )
     {
         *ppHead = new;
-		printf("it's the head of list \n");
+        printf("it's the head of list \n");
 
         return OK;
     }else

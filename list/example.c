@@ -1,9 +1,10 @@
-
+/***********************************************
+ * file       : example.c
+ * description: the example for LinkList
+ * author     : lamar
+ * date       : 2018/04/07
+ *************/
 #include "list.h"
-
-
-
-
 
 int main()
 {
