@@ -3,8 +3,9 @@ Coding everyday.(include the C/C++, Script, DataStruct, Algorithm )
 
 
 ===list===
-Envirment: Ubuntu16.04
-Usage    : make; ./example
+--------
+Envirment: Ubuntu16.04 <br>
+Usage    : make; ./example <br>
 
 
 
