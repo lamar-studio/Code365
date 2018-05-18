@@ -6,7 +6,7 @@
 
 
 #####  模块配置  #####
-TARGET  ?= exp_1
+TARGET  ?= exp
 SRC = $(shell ls *.c)
 OBJ = $(SRC:.c=.o)
 
@@ -14,7 +14,8 @@ OBJ = $(SRC:.c=.o)
 #####  编译选项  #####
 CC   	?= gcc
 INCLUDE  = -I.
-CFLAGS  += -fPIC -Wall -Wextra -ansi -pedantic
+#CFLAGS  += -fPIC -Wall -Wextra -ansi -pedantic
+CFLAGS   += -lrt
 
 ifndef DEBUG
 #用于代码优化
@@ -36,16 +37,18 @@ QUIET_RANLIB	= @echo "RANLIB	$@";
 #####  shell工具  #####
 RM         ?= rm -f
 CLEAN_OK    = @echo "=== clean ok =====";
+BUILD_SUCCESS = @echo "=== build success ==="
 
 
 #####  Makefile编译规则  #####
 all: $(TARGET)
+	$(BUILD_SUCCESS)
 
-$(TARGET): $(OBJ)
-	$(QUIET_LINK) $(CC) -o $@ $(OBJ) 
+#$(TARGET): $(OBJ)
+#	$(QUIET_LINK) $(CC) -o $@ $(OBJ) 
 
-%.o: %.c
-	$(QUIET_CC) $(CC) -c -o $@ $< $(CFLAGS) $(INCLUDE)
+$(TARGET):
+	gcc -o $@ main.c -lrt 
 
 clean:
 	$(RM) $(OBJ) $(TARGET)
