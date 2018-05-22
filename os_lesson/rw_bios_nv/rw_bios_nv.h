@@ -1,0 +1,14 @@
+#ifndef _RW_BIOS_NV_H
+#define _RW_BIOS_NV_H
+/* ������� */
+#define RW_BIOS_NV_IOC_MAGIC  'k'
+
+/* �������� */
+#define RW_BIOS_NV_IOCPRINT      _IO(RW_BIOS_NV_IOC_MAGIC, 1)
+#define RW_BIOS_NV_IOCGETDATA    _IOR(RW_BIOS_NV_IOC_MAGIC, 2, unsigned long)
+
+#define RW_BIOS_NV_IOCGETBIOSNV  _IOW(RW_BIOS_NV_IOC_MAGIC, 3, BIOS_VAR_STRUCTURE)
+#define RW_BIOS_NV_IOCSETBIOSNV  _IOW(RW_BIOS_NV_IOC_MAGIC, 4, BIOS_VAR_STRUCTURE)
+
+#define RW_BIOS_NV_IOC_MAXNR 4
+#endif
