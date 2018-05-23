@@ -6,15 +6,15 @@
 
 
 #####  模块配置  #####
-TARGET  ?= exe
+TARGET  ?= client
 SRC = $(shell ls *.c)
 OBJ = $(SRC:.c=.o)
 
 
 #####  编译选项  #####
 CC   	?= gcc
-INCLUDE  = -I. 
-CFLAGS  += -fPIC -Wall -Wextra -ansi -pedantic -std=c99 -lpthread
+INCLUDE  = -I.
+CFLAGS  += -fPIC -Wall -Wextra -ansi -pedantic -std=c99
 
 ifndef DEBUG
 #用于代码优化
@@ -42,7 +42,7 @@ CLEAN_OK    = @echo "=== clean ok =====";
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
-	$(QUIET_LINK) $(CC) -o $@ $(OBJ) $(CFLAGS)
+	$(QUIET_LINK) $(CC) -o $@ $(OBJ) 
 
 %.o: %.c
 	$(QUIET_CC) $(CC) -c -o $@ $< $(CFLAGS) $(INCLUDE)

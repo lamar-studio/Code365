@@ -1,4 +1,4 @@
-###################
+##################
 # file  : the Makefile for list project
 # author: lamar
 # date  : 2018/04/07
@@ -6,7 +6,7 @@
 
 
 #####  模块配置  #####
-TARGET  ?= exp_1
+TARGET  ?= server
 SRC = $(shell ls *.c)
 OBJ = $(SRC:.c=.o)
 
@@ -14,7 +14,7 @@ OBJ = $(SRC:.c=.o)
 #####  编译选项  #####
 CC   	?= gcc
 INCLUDE  = -I.
-CFLAGS  += -fPIC -Wall -Wextra -ansi -pedantic
+CFLAGS  += -fPIC -Wall -Wextra -ansi -pedantic -std=c99
 
 ifndef DEBUG
 #用于代码优化
