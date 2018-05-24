@@ -7,8 +7,16 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
+#include <pthread.h>
+#include <semaphore.h>
 
 #include "server.h"
+
+void *server_terminal(void *arg);
+pthread_mutex_t info_mutex;
+server_info cfg;
+int exit_flag = 0;
+
 
 int main()
 {
@@ -18,7 +26,21 @@ int main()
     struct sockaddr_un client_addr;
     int ret;
     fd_set readfds, testfsd;
+    pthread_t thread_s;
+    void *thread_result;
 
+    memset(&cfg, 0, sizeof(cfg));
+    memcpy(cfg.mode, UPPER, sizeof(UPPER));
+    ret = pthread_mutex_init(&info_mutex, NULL);
+    if(ret != 0) {
+        perror("server pthread_mutex_init");
+        exit(1);
+    }
+    ret = pthread_create(&thread_s, NULL, server_terminal, NULL);
+    if(ret != 0) {
+        perror("server pthread_create");
+        exit(1);
+    }
 
     //创建
     unlink(SERVER_ADDR);
@@ -44,7 +66,7 @@ int main()
 
         testfsd = readfds;
 
-        printf("\nserver waiting ...\n");
+        //printf("\nserver waiting ...\n");
         ret = select(FD_SETSIZE, &testfsd, (fd_set *)0, (fd_set *)0,
             (struct timeval *)0);
         if(ret < 1) {
@@ -59,25 +81,50 @@ int main()
                     client_sockfd = accept(server_sockfd,
                                   (struct sockaddr *)&client_addr, &client_len);
                     FD_SET(client_sockfd, &readfds);
-                    printf("adding client on fd %d\n", client_sockfd);
+                    //printf("adding client on fd %d\n", client_sockfd);
+                    pthread_mutex_lock(&info_mutex);
+                    cfg.client_id = client_sockfd;
+                    pthread_mutex_unlock(&info_mutex);
                 }
                 else { //client端处理
                     ioctl(fd, FIONREAD, &nread);
                     if(nread == 0) {
                         close(fd);
                         FD_CLR(fd, &readfds);
-                        printf("removing client on fd %d\n", fd);
+                        //printf("removing client on fd %d\n", fd);
                     }
                     else {
                         nread = read(fd, buf, sizeof(buf));
                         sleep(1);
-                        upper_process(fd, buf, nread);
+                        pthread_mutex_lock(&info_mutex);
+                        cfg.char_cnt += strlen(buf);
+                        pthread_mutex_unlock(&info_mutex);
+                        if (strncmp(cfg.mode, UPPER, sizeof(UPPER)-1) == 0)
+                            upper_process(fd, buf, nread);
+
+                        if (strncmp(cfg.mode, LOWER, sizeof(LOWER)-1) == 0)
+                            lower_process(fd, buf, nread);
+
                         write(fd, buf, sizeof(buf));
                     }
                 }
             }
         }
+        if (exit_flag == 1){
+            close(fd);
+            FD_CLR(fd, &readfds);
+            break;
+        }
     }
+    ret = pthread_join(thread_s, &thread_result);
+    if(ret != 0) {
+        perror("server pthread_join");
+        exit(1);
+    }
+
+    pthread_mutex_destroy(&info_mutex);
+
+    exit(0);
 }
 
 
@@ -95,8 +142,49 @@ int upper_process(int fd, char data[], int len)
     return i;
 }
 
+int lower_process(int fd, char data[], int len)
+{
+    int i = 0;
 
+    for( i = 0; i < len; i++) {
+        data[i] = tolower(data[i]);
+    }
+    printf("tolower server to client on fd %d\n", fd);
 
+    return i;
+}
+
+void *server_terminal(void *arg)
+{
+    char buf[50]   = {0};
+    char client[5] = {0};
+    char mode[10]  = {0};
+
+    while(1) {
+        printf("\nSERVER> ");
+        fgets(buf, sizeof(buf), stdin);
+        if (strncmp(buf, SHOW_INFO, sizeof(SHOW_INFO)-1) == 0) {
+            pthread_mutex_lock(&info_mutex);
+            printf("\nServer info:\n");
+            printf("Global mode: %s\n", cfg.mode);
+            printf("Characters: %d\n", cfg.char_cnt);
+            printf("Clients: %d\n", cfg.client_id);
+            pthread_mutex_unlock(&info_mutex);
+        }
+        else if(strncmp(buf, QUIT, sizeof(QUIT)-1) == 0) {
+            exit_flag = 1;
+            printf("quit server\n");
+            break;
+        }
+        else if(strncmp(buf, MODE, sizeof(MODE)-1) == 0) {
+            sscanf (buf, "mode %[0-9] %[a-z]", client, mode);
+            pthread_mutex_lock(&info_mutex);
+            cfg.client_id = atoi(client);
+            memcpy(cfg.mode, mode, strlen(mode));
+            pthread_mutex_unlock(&info_mutex);
+        }
+    }
+}
 
 
 

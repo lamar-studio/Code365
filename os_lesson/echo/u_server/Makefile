@@ -14,7 +14,7 @@ OBJ = $(SRC:.c=.o)
 #####  编译选项  #####
 CC   	?= gcc
 INCLUDE  = -I.
-CFLAGS  += -fPIC -Wall -Wextra -ansi -pedantic -std=c99
+CFLAGS  += -fPIC -Wall -Wextra -ansi -pedantic -std=c99 -lpthread
 
 ifndef DEBUG
 #用于代码优化
@@ -42,7 +42,7 @@ CLEAN_OK    = @echo "=== clean ok =====";
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
-	$(QUIET_LINK) $(CC) -o $@ $(OBJ) 
+	$(QUIET_LINK) $(CC) -o $@ $(OBJ) $(CFLAGS) 
 
 %.o: %.c
 	$(QUIET_CC) $(CC) -c -o $@ $< $(CFLAGS) $(INCLUDE)
