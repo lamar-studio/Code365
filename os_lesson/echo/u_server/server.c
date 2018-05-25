@@ -65,7 +65,7 @@ int main()
             printf("\nServer info:\n");
             printf("Global mode: %s\n", cfg.mode);
             printf("Characters: %d\n", cfg.char_cnt);
-            printf("Clients: %d\n", cfg.client_id);
+            printf("Clients: %d\n", cfg.client_cnt);
             pthread_mutex_unlock(&info_mutex);
         }
         else if(strncmp(buf, QUIT, sizeof(QUIT)-1) == 0) {
@@ -177,9 +177,11 @@ void *server_process(void *arg)
                     client_sockfd = accept(server_sockfd,
                                   (struct sockaddr *)&client_addr, &client_len);
                     FD_SET(client_sockfd, &readfds);
+                    sprintf(buf, "%d", client_sockfd);
+                    write(client_sockfd, buf, sizeof(buf));
                     //printf("adding client on fd %d\n", client_sockfd);
                     pthread_mutex_lock(&info_mutex);
-                    cfg.client_id = client_sockfd;
+                    cfg.client_cnt++;
                     pthread_mutex_unlock(&info_mutex);
                 }
                 else { //client端处理
@@ -190,7 +192,7 @@ void *server_process(void *arg)
                         //printf("removing client on fd %d\n", fd);
                     }
                     else {
-                        if (fd == cfg.client_id) {
+                        if (fd != 0) { //todo 增加队列动态识别
                             nread = read(fd, buf, sizeof(buf));
                             sleep(1);
                             pthread_mutex_lock(&info_mutex);

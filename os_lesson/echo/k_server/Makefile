@@ -1,5 +1,5 @@
 
-TARGET:=hello
+TARGET:= server
 obj-m := $(TARGET).o
 
 

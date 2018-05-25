@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
             break;
         case 'k':
             printf("\nconnect the kernel server.\n");
-            //todo the kernel server.
+            kernel_connect();
             break;
         case ':':
             printf("\nplease config the server.\n");

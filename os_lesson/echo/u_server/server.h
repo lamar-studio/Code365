@@ -11,9 +11,10 @@
 #define LOWER        "lower"
 
 typedef struct server_info {
+    int client_id;
     char mode[10];
     int char_cnt;
-    int client_id;
+    int client_cnt;
 }server_info;
 
 void upper_process(int fd, char data[], int len);
