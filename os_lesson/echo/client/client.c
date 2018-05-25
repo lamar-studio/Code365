@@ -32,6 +32,10 @@ int user_connect()
     while(1) {
         printf("\nCLIENT> ");
         fgets(buf, sizeof(buf), stdin);
+
+        if(buf[0] == '\n')
+            continue;
+
         if (strncmp(buf, QUIT, sizeof(QUIT)-1) == 0) {
             close(sockfd);
             exit(0);
@@ -41,7 +45,6 @@ int user_connect()
         printf("\nECHO: %s", buf);
 
     }
-
     close(sockfd);
 
     return 0;

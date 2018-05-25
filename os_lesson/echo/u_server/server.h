@@ -16,8 +16,8 @@ typedef struct server_info {
     int client_id;
 }server_info;
 
-int upper_process(int fd, char data[], int len);
-
+void upper_process(int fd, char data[], int len);
+void lower_process(int fd, char data[], int len);
 
 
 
