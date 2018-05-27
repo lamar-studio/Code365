@@ -5,7 +5,7 @@
 #include <linux/proc_fs.h>
 #include <linux/sched.h>
 #include <linux/types.h>
-#include <asm/uaccess.h>
+#include <asm-generic/uaccess.h>
 
 #define STR_MAX_SIZE 255
 static int int_var;
@@ -115,7 +115,7 @@ static int __init procfs_exam_init(void)
         if (entry) {
                 entry->data = &int_var;
                 entry->read_proc = &int_read_proc;
-                entry->write_proc = &int_write_proc; 
+                entry->write_proc = &int_write_proc;
         }
 
 
@@ -123,14 +123,14 @@ static int __init procfs_exam_init(void)
         if (entry) {
                 entry->data = &string_var;
                 entry->read_proc = &string_read_proc;
-                entry->write_proc = &string_write_proc; 
+                entry->write_proc = &string_write_proc;
         }
 
         entry = create_proc_entry("bigprocfile", 0644, myprocroot);
         if (entry) {
                 entry->data = &big_buffer;
                 entry->read_proc = &bigfile_read_proc;
-                entry->write_proc = &bigfile_write_proc; 
+                entry->write_proc = &bigfile_write_proc;
         }
 #else
         printk("This module requires the kernel to support procfs,\n");

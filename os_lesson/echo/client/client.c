@@ -5,6 +5,11 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <poll.h>
+#include <linux/netlink.h>
+#include <errno.h>
+#include <err.h>
+#include <string.h>
 
 #define BUF_SIZE  1024
 #define QUIT      "quit"
@@ -61,14 +66,29 @@ int user_connect()
 
 int kernel_connect()
 {
+    int ret;
+    char buf[BUF_SIZE] = {0};
 	int socket_fd = open_netlink();
 	if (socket_fd < 0) {
-		err(1, "netlink");
+		perror("client open_netlink");
+        exit(1);
 	}
+
 	while (1) {
-		send_event(socket_fd);
+        printf("\nCLIENT> ");
+        fgets(buf, sizeof(buf), stdin);
+
+        if(buf[0] == '\n')
+            continue;
+
+        if (strncmp(buf, QUIT, sizeof(QUIT)-1) == 0) {
+            close(socket_fd);
+            exit(0);
+        }
+		send_event(socket_fd, buf);
 		sleep(1);
-		read_event(socket_fd);
+		read_event(socket_fd, buf);
+        printf("\nECHO: %s", buf);
 	}
 
 	return 0;
@@ -93,8 +113,9 @@ int open_netlink()
 	return socket_fd;
 }
 
-int send_event(int socket_fd)
+int send_event(int socket_fd, char data[])
 {
+	//printf("send_event in Sending message to kernel linzr...");
 	struct iovec       iov;
 	struct sockaddr_nl dest_addr;
 	struct nlmsghdr *  nlh = NULL;
@@ -106,13 +127,12 @@ int send_event(int socket_fd)
 	dest_addr.nl_groups = 0; /* unicast */
 
 	nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_PAYLOAD));
-
+	//printf("11 Sending message to kernel linzr...");
 	memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
 	nlh->nlmsg_len   = NLMSG_SPACE(MAX_PAYLOAD);
 	nlh->nlmsg_pid   = getpid();
 	nlh->nlmsg_flags = 0;
-
-	strcpy(NLMSG_DATA(nlh), "Message from User");
+	strcpy(NLMSG_DATA(nlh), data);
 	memset(&msg_hdr, 0, sizeof(struct msghdr)); // very very very important
 
 	iov.iov_base        = (void *)nlh;
@@ -122,13 +142,13 @@ int send_event(int socket_fd)
 	msg_hdr.msg_iov     = &iov;
 	msg_hdr.msg_iovlen  = 1;
 
-	printf("Sending message to kernel...");
+	printf("Sending message to kernel: %s", data);
 	int ret = sendmsg(socket_fd, &msg_hdr, 0);
-	printf("Done: %d %s\n", ret, strerror(errno));
+	//printf("Done: %d %s\n", ret, strerror(errno));
 	free(nlh);
 }
 
-int read_event(int socket_fd)
+int read_event(int socket_fd, char data[])
 {
 	struct sockaddr_nl nladdr;
 	struct msghdr      msg_hdr;
@@ -150,13 +170,14 @@ int read_event(int socket_fd)
 
 	int ret = 0;
 
-	#ifndef USING_POLL
 	ret = recvmsg(socket_fd, &msg_hdr, 0);
 	if (ret < 0) {
+        perror("client recvmsg");
 		return ret;
 	}
-	printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
-
+	printf("Received message from kernel: %s", (char *)NLMSG_DATA(nlh));
+    memcpy(data, (char *)NLMSG_DATA(nlh), nlh->nlmsg_len);
+    #if 0
 	printf("\nret:%d (nlh)->nlmsg_len:%d\n", ret, nlh->nlmsg_len);
 
 	printf("NLMSG_PAYLOAD: %d \n"
@@ -165,35 +186,7 @@ int read_event(int socket_fd)
 	       MAX_PAYLOAD,
 	       NLMSG_SPACE(MAX_PAYLOAD),
 	       NLMSG_PAYLOAD(nlh, 0));
-	#else
-	struct pollfd clientfd[1];
-	clientfd[0].fd                              = socket_fd;
-	clientfd[0].events                          = POLLIN; //POLLRDNORM;
-	unsigned char buf[NLMSG_SPACE(MAX_PAYLOAD)] = { 0 };
-	memset(buf, sizeof(buf), 0);
-
-	while (1) {
-		printf("before poll\n");
-		if (0 >= poll(clientfd, 1, -1)) {
-			printf("poll error\n");
-			break;
-		}
-		printf("after poll\n");
-		if (clientfd[0].revents & POLLIN) {
-			#ifdef USING_RECVMSG
-			ret = recvmsg(clientfd[0].fd, &msg_hdr, 0);
-			printf("Received message payload: %s\n", (char *)NLMSG_DATA(nlh));
-			#else
-			ret = recv(clientfd[0].fd, buf, 100, 0);
-			if (ret > 0) {
-				for (int i = 0; i < ret; i++)
-					printf("payloud %d: %d:%c\n", i, buf[i], buf[i]);
-			}
-			#endif
-			ret = 0;
-		}
-	}
-	#endif
+    #endif
 
 	free(nlh);
 }
