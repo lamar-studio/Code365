@@ -13,7 +13,6 @@
 typedef struct server_info {
     int client_id;
     char mode[10];
-    int char_cnt;
     int client_cnt;
 }server_info;
 

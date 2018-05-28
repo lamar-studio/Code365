@@ -42,6 +42,7 @@ int user_connect()
     }
     read(sockfd, buf, sizeof(buf));
     printf("\nClient ID is:%s", buf);
+
     while(1) {
         printf("\nCLIENT> ");
         fgets(buf, sizeof(buf), stdin);
@@ -107,7 +108,6 @@ int open_netlink()
 	addr.nl_family = AF_NETLINK;
 	addr.nl_pid    = getpid();
 	addr.nl_groups = MY_GROUP; // for multicast or broadcast
-	// addr.nl_groups = 0; // for unicast
 	if (bind(socket_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
 		return -1;
 	return socket_fd;
@@ -133,7 +133,7 @@ int send_event(int socket_fd, char data[])
 	nlh->nlmsg_pid   = getpid();
 	nlh->nlmsg_flags = 0;
 	strcpy(NLMSG_DATA(nlh), data);
-	memset(&msg_hdr, 0, sizeof(struct msghdr)); // very very very important
+	memset(&msg_hdr, 0, sizeof(struct msghdr));
 
 	iov.iov_base        = (void *)nlh;
 	iov.iov_len         = nlh->nlmsg_len;
@@ -142,7 +142,7 @@ int send_event(int socket_fd, char data[])
 	msg_hdr.msg_iov     = &iov;
 	msg_hdr.msg_iovlen  = 1;
 
-	printf("Sending message to kernel: %s", data);
+	//printf("Sending message to kernel: %s", data);
 	int ret = sendmsg(socket_fd, &msg_hdr, 0);
 	//printf("Done: %d %s\n", ret, strerror(errno));
 	free(nlh);
@@ -175,7 +175,7 @@ int read_event(int socket_fd, char data[])
         perror("client recvmsg");
 		return ret;
 	}
-	printf("Received message from kernel: %s", (char *)NLMSG_DATA(nlh));
+	//printf("Received message from kernel: %s", (char *)NLMSG_DATA(nlh));
     memcpy(data, (char *)NLMSG_DATA(nlh), nlh->nlmsg_len);
     #if 0
 	printf("\nret:%d (nlh)->nlmsg_len:%d\n", ret, nlh->nlmsg_len);
