@@ -5,15 +5,23 @@
 #include <linux/skbuff.h>
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
+#include <linux/ctype.h>
+#include <linux/unistd.h>
+
+
 
 
 #define BUF_SIZE  1024
 #define NETLINK_USER 31
 #define GROUP 1
+#define MODE         "mode"
+#define UPPER        "upper"
+#define LOWER        "lower"
 
 //procfs
 #define PROCFS_MAX_SIZE		1024
 #define PROCFS_NAME 		"socket_config"
+#define PROCFS_SERVER       "server_info"
 
 struct sock *nl_sk = NULL;
 
@@ -26,6 +34,46 @@ static int len_check = 1;
 static char procfs_buffer[PROCFS_MAX_SIZE];
 //The size of the buffer
 static unsigned long procfs_buffer_size = 0;
+
+static char mode[10] = {0};
+
+static void upper_process(char data[], int len)
+{
+    int i = 0;
+
+    for( i = 0; i < len; i++) {
+        data[i] = toupper(data[i]);
+        msleep(200);
+    }
+	printk(KERN_INFO "upper server to client\n");
+
+    return;
+}
+
+static void lower_process(char data[], int len)
+{
+    int i = 0;
+
+    for( i = 0; i < len; i++) {
+        data[i] = tolower(data[i]);
+        msleep(200);
+    }
+	printk(KERN_INFO "lower server to client\n");
+
+    return;
+}
+
+static void normal_process(char data[], int len)
+{
+    int i = 0;
+
+    for( i = 0; i < len; i++) {
+        msleep(200);
+    }
+	printk(KERN_INFO "normal server to client\n");
+
+    return;
+}
 
 
 static void nl_recv_msg(struct sk_buff *skb)
@@ -47,6 +95,10 @@ static void nl_recv_msg(struct sk_buff *skb)
 	msg_size = strlen((char *)nlmsg_data(nlh));
 	printk(KERN_INFO "Entering: %s\n", __FUNCTION__);
     strncpy(msg, (char *)nlmsg_data(nlh), msg_size);
+	printk(KERN_INFO "msg from user:%s len:%d\n", msg, strlen(msg));
+
+
+    upper_process(msg, strlen(msg));
 
 	//发送数据(多播)
 	skb_out = nlmsg_new(msg_size, 0);
