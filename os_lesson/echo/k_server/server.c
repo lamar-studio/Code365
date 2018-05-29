@@ -97,6 +97,8 @@ static void nl_recv_msg(struct sk_buff *skb)
     strncpy(msg, (char *)nlmsg_data(nlh), msg_size);
 	printk(KERN_INFO "msg from user:%s len:%d\n", msg, strlen(msg));
 
+    procfs_buffer[PROCFS_MAX_SIZE-1] = 0;
+    printk(KERN_INFO "the proc config:%s", procfs_buffer);
 
     upper_process(msg, strlen(msg));
 
