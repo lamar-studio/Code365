@@ -258,7 +258,7 @@ void *server_process(void *arg)
                         pthread_mutex_lock(&info_mutex);
                         client_cnt--;
                         pthread_mutex_unlock(&info_mutex);
-                        //printf("removing client on fd %d\n", fd);
+                        printf("Disconnected from the client %d !\n", fd);
                     }
                     else {
                         sprintf(key_tag, "%d", fd);

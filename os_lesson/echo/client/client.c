@@ -37,7 +37,7 @@ int user_connect()
     ret = connect(sockfd, &addr, len);
     if(ret == -1)
     {
-        perror("client connect");
+		perror("Unable to establish a connection with the server!");
         exit(1);
     }
     read(sockfd, buf, sizeof(buf));
@@ -52,6 +52,7 @@ int user_connect()
 
         if (strncmp(buf, QUIT, sizeof(QUIT)-1) == 0) {
             close(sockfd);
+            printf("Disconnected from the server!");
             exit(0);
         }
         write(sockfd, buf, sizeof(buf));
@@ -71,7 +72,7 @@ int kernel_connect()
     char buf[BUF_SIZE] = {0};
 	int socket_fd = open_netlink();
 	if (socket_fd < 0) {
-		perror("client open_netlink");
+		perror("Unable to establish a connection with the server!");
         exit(1);
 	}
 

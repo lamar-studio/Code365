@@ -13,7 +13,7 @@
 
 //procfs
 #define PROCFS_MAX_SIZE		1024
-#define PROCFS_NAME 		"linzr"
+#define PROCFS_NAME 		"socket_config"
 
 struct sock *nl_sk = NULL;
 
@@ -77,12 +77,15 @@ static ssize_t procfile_read(struct file *file,
  		return 0;
 	}
 
-	printk(KERN_INFO "procfile_read (/proc/%s) called\nlength:%d\n
-           procfs_buffer_size:%d\noffset:%d\n", PROCFS_NAME, length,
+	printk(KERN_INFO "procfile_read (/proc/%s) called\nlength:%d\n"
+           "procfs_buffer_size:%d\noffset:%d\n", PROCFS_NAME, length,
            procfs_buffer_size, offset);
 
 		//将buffer的数据送回给用户
 		copy_to_user(buffer,procfs_buffer,procfs_buffer_size);
+
+        procfs_buffer[PROCFS_MAX_SIZE-1] = 0;
+        //printk(KERN_INFO "the user write:%s", procfs_buffer);
 
 		return procfs_buffer_size;
 }
@@ -104,6 +107,8 @@ static ssize_t procfile_write(struct file *file,
 	if ( copy_from_user(procfs_buffer, buf, procfs_buffer_size) ) {
 		return -EFAULT;
 	}
+    procfs_buffer[PROCFS_MAX_SIZE-1] = 0;
+	printk(KERN_INFO "the user write:%s", procfs_buffer);
 
 	return procfs_buffer_size;
 }
