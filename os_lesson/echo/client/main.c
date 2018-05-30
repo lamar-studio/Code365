@@ -34,7 +34,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    printf("the end of the main.\n");
     return 0;
 }
 

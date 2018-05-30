@@ -1,7 +1,8 @@
 
 TARGET:= server
+#TOOL  := hash   适用于多个文件链接
 obj-m := $(TARGET).o
-
+#$(TARGET)-objs := $(TARGET).o $(TOOL).o
 
 KERNELDIR := /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd) 

@@ -13,28 +13,27 @@
 #include "server.h"
 #include "hash.h"
 
-void *server_process(void *arg);
-pthread_mutex_t info_mutex;
-server_info cfg;
-int char_cnt;         //字符计数
-int client_cnt;       //客户端计数
-char gMode[10];       //默认全局配置
-Hash *hash_table;
+pthread_mutex_t        info_mutex;
+struct server_info     cfg;
+struct hash_table     *hash_table;
+static int             char_cnt;         //字符计数
+static int             client_cnt;       //客户端计数
+static char            gMode[10];        //默认全局配置
 
 int main()
 {
     int server_sockfd;
     int server_len;
-    struct sockaddr_un server_addr;
-    int ret = -1;
-    pthread_t thread_s;
+    int ret             = -1;
     void *thread_result;
+    struct sockaddr_un server_addr;
+    pthread_t thread_s;
 
     memset(&cfg, 0, sizeof(cfg));
     memcpy(cfg.mode, UPPER, sizeof(UPPER));
     memcpy(gMode, UPPER, sizeof(UPPER));
-    char_cnt = 0;
-    client_cnt = 0;
+    char_cnt       = 0;
+    client_cnt     = 0;
 
 	//创建哈希表
 	hash_table = hash_new();
@@ -53,7 +52,7 @@ int main()
         goto err_hash;
     }
 
-    //命名
+    //连接
     server_addr.sun_family = AF_UNIX;
     strcpy(server_addr.sun_path, SERVER_ADDR);
     server_len = sizeof(server_addr);
@@ -62,8 +61,6 @@ int main()
         perror("server bind");
         goto err_hash;
     }
-
-    //连接
     ret = listen(server_sockfd, 5);
     if (ret != 0) {
         perror("server listen");
@@ -83,9 +80,9 @@ int main()
     }
 
     while(1) {
-        char buf[50]   = {0};
-        char client[5] = {0};
-        char mode[10]  = {0};
+        char buf[50]       = {0};
+        char client[5]     = {0};
+        char mode[10]      = {0};
 
         printf("\nSERVER> ");
         fgets(buf, sizeof(buf), stdin);
@@ -96,29 +93,25 @@ int main()
             printf("Characters: %d\n", char_cnt);
             printf("Clients: %d\n", client_cnt);
             pthread_mutex_unlock(&info_mutex);
-        }
-        else if(strncmp(buf, QUIT, sizeof(QUIT)-1) == 0) {
+        } else if(strncmp(buf, QUIT, sizeof(QUIT)-1) == 0) {
             break;
-        }
-        else if(strncmp(buf, MODE, sizeof(MODE)-1) == 0) {
-            sscanf (buf, "mode %[0-9] %[a-z]", client, mode);
+        }else if(strncmp(buf, MODE, sizeof(MODE)-1) == 0) {
+            sscanf(buf, "mode %[0-9] %[a-z]", client, mode);
             if (client[0] == '0') {
                 pthread_mutex_lock(&info_mutex);
                 memcpy(gMode, mode, strlen(mode));
                 pthread_mutex_unlock(&info_mutex);
-            }
-            else {
+            } else {
                 pthread_mutex_lock(&info_mutex);
                 ret = hash_get(hash_table, client, &cfg);
                 pthread_mutex_unlock(&info_mutex);
-                if(ret == 0) {  // 在哈希表中没有
+                if(ret == 0) {                              // 在哈希表中没有
                     printf("not found this client %s", client);
                     continue;
-                }
-                else {//在哈希表中找到
+                } else {                                    //在哈希表中找到
                     pthread_mutex_lock(&info_mutex);
                     memcpy(cfg.mode, mode, strlen(mode));
-                    hash_set(&hash_table, client, cfg);    //更新到哈希表中
+                    hash_set(&hash_table, client, cfg);     //更新到哈希表中
                     pthread_mutex_unlock(&info_mutex);
                 }
             }
@@ -191,13 +184,13 @@ void normal_process(int fd, char data[], int len)
 
 void *server_process(void *arg)
 {
-    fd_set readfds, testfsd;
     int client_sockfd;
     int ret;
     int client_len;
-    int server_sockfd = *(int *)arg;
+    int server_sockfd         = *(int *)arg;
+	char key_tag[20]          = {0};
+    fd_set readfds, testfsd;
     struct sockaddr_un client_addr;
-	char key_tag[20]  = {0};
 
     ret = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     if (ret != 0) {
@@ -216,8 +209,8 @@ void *server_process(void *arg)
 
     while(1) {
         char buf[BUF_SIZE] = {0};
-        int fd;
-        int nread;
+        int  fd;
+        int  nread;
 
         testfsd = readfds;
 
@@ -232,7 +225,7 @@ void *server_process(void *arg)
 
         for(fd = 0; fd < FD_SETSIZE; fd++) {
             if( FD_ISSET(fd, &testfsd) ) {
-                if (fd == server_sockfd) { //新的连接请求
+                if (fd == server_sockfd) {                 //新的连接请求
                     client_len    = sizeof(client_addr);
                     client_sockfd = accept(server_sockfd,
                                   (struct sockaddr *)&client_addr, &client_len);
@@ -247,8 +240,7 @@ void *server_process(void *arg)
                     memcpy(cfg.mode, gMode, strlen(gMode));
                     hash_set(&hash_table, buf, cfg);
                     pthread_mutex_unlock(&info_mutex);
-                }
-                else { //client端处理
+                } else {                                     //client端处理
                     ioctl(fd, FIONREAD, &nread);
                     if(nread == 0) {
                         sprintf(key_tag, "%d", fd);
@@ -258,27 +250,24 @@ void *server_process(void *arg)
                         pthread_mutex_lock(&info_mutex);
                         client_cnt--;
                         pthread_mutex_unlock(&info_mutex);
-                        printf("Disconnected from the client %d !\n", fd);
-                    }
-                    else {
+                        printf("\nDisconnected from the client %d !\n", fd);
+                    } else {
                         sprintf(key_tag, "%d", fd);
                         pthread_mutex_lock(&info_mutex);
                         ret = hash_get(hash_table, key_tag, &cfg);
                         pthread_mutex_unlock(&info_mutex);
-                        if(ret == 0) {// 在哈希表中没有
+                        if(ret == 0) {
                             continue;
-                        }
-                        else {//在哈希表中找到
+                        } else {
                             nread = read(fd, buf, sizeof(buf));
                             //printf("cfg.mode %s\n", cfg.mode);
                             //printf("cfg.client_id %d\n", cfg.client_id);
 
                             pthread_mutex_lock(&info_mutex);
                             char_cnt += (strlen(buf) - 1);
-                            if (strncmp(cfg.mode, UPPER, sizeof(UPPER)-1) == 0){
+                            if (strncmp(cfg.mode, UPPER, sizeof(UPPER)-1) == 0) {
                                 upper_process(fd, buf, strlen(buf));
-                            }
-                            else if(strncmp(cfg.mode, LOWER, sizeof(LOWER)-1) == 0){
+                            } else if(strncmp(cfg.mode, LOWER, sizeof(LOWER)-1) == 0) {
                                 lower_process(fd, buf, strlen(buf));
                             } else {
                                 normal_process(fd, buf, strlen(buf));

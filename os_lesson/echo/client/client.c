@@ -11,16 +11,14 @@
 #include <err.h>
 #include <string.h>
 
-#define BUF_SIZE  1024
-#define QUIT      "quit"
-
+#define BUF_SIZE          1024
+#define NETLINK_USER      31
+#define MAX_PAYLOAD       1024
+#define QUIT              "quit"
 #define USING_RECVMSG
-#define NETLINK_USER 31
-#define MY_GROUP 1
-#define MAX_PAYLOAD 1024 /* maximum payload size*/
 
 
-int user_connect()
+void user_connect()
 {
     int sockfd;
     int len;
@@ -37,7 +35,7 @@ int user_connect()
     ret = connect(sockfd, &addr, len);
     if(ret == -1)
     {
-		perror("Unable to establish a connection with the server!");
+		perror("Unable to establish a connection with the server!\n");
         exit(1);
     }
     read(sockfd, buf, sizeof(buf));
@@ -52,7 +50,7 @@ int user_connect()
 
         if (strncmp(buf, QUIT, sizeof(QUIT)-1) == 0) {
             close(sockfd);
-            printf("Disconnected from the server!");
+            printf("Disconnected from the server!\n");
             exit(0);
         }
         write(sockfd, buf, sizeof(buf));
@@ -62,11 +60,11 @@ int user_connect()
     }
     close(sockfd);
 
-    return 0;
+    return ;
 }
 
 
-int kernel_connect()
+void kernel_connect()
 {
     int ret;
     char buf[BUF_SIZE] = {0};
@@ -75,6 +73,7 @@ int kernel_connect()
 		perror("Unable to establish a connection with the server!");
         exit(1);
 	}
+    printf("\nClient ID is %d", getpid());
 
 	while (1) {
         printf("\nCLIENT> ");
@@ -84,7 +83,10 @@ int kernel_connect()
             continue;
 
         if (strncmp(buf, QUIT, sizeof(QUIT)-1) == 0) {
+            send_event(socket_fd, buf);
+            read_event(socket_fd, buf);
             close(socket_fd);
+            printf("\nDisconnected from the server!\n");
             exit(0);
         }
 		send_event(socket_fd, buf);
@@ -93,33 +95,39 @@ int kernel_connect()
         printf("\nECHO: %s", buf);
 	}
 
-	return 0;
+	return ;
 }
 
 
 int open_netlink()
 {
-	int  socket_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_USER);
-	struct sockaddr_nl addr;
+	int                    socket_fd;
+	struct sockaddr_nl     addr;
 
+    socket_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_USER);
+	if (socket_fd < 0) {
+        exit(1);
+    }
 	memset((void *)&addr, 0, sizeof(addr));
 
-	if (socket_fd < 0)
-		return socket_fd;
 	addr.nl_family = AF_NETLINK;
 	addr.nl_pid    = getpid();
-	addr.nl_groups = MY_GROUP; // for multicast or broadcast
-	if (bind(socket_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
-		return -1;
+	addr.nl_groups = 0;
+
+	if (bind(socket_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        close(socket_fd);
+		exit(1);
+    }
+
 	return socket_fd;
 }
 
 int send_event(int socket_fd, char data[])
 {
-	//printf("send_event in Sending message to kernel linzr...");
+	//printf("send_event in Sending message to kernel ...");
 	struct iovec       iov;
 	struct sockaddr_nl dest_addr;
-	struct nlmsghdr *  nlh = NULL;
+	struct nlmsghdr   *nlh = NULL;
 	struct msghdr      msg_hdr;
 
 	memset(&dest_addr, 0, sizeof(dest_addr));
@@ -128,7 +136,6 @@ int send_event(int socket_fd, char data[])
 	dest_addr.nl_groups = 0; /* unicast */
 
 	nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(MAX_PAYLOAD));
-	//printf("11 Sending message to kernel linzr...");
 	memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
 	nlh->nlmsg_len   = NLMSG_SPACE(MAX_PAYLOAD);
 	nlh->nlmsg_pid   = getpid();
@@ -143,10 +150,13 @@ int send_event(int socket_fd, char data[])
 	msg_hdr.msg_iov     = &iov;
 	msg_hdr.msg_iovlen  = 1;
 
-	//printf("Sending message to kernel: %s", data);
 	int ret = sendmsg(socket_fd, &msg_hdr, 0);
-	//printf("Done: %d %s\n", ret, strerror(errno));
+    if (ret < 0) {
+		perror("client sendmsg");
+    }
 	free(nlh);
+
+    return ret;
 }
 
 int read_event(int socket_fd, char data[])
@@ -174,6 +184,7 @@ int read_event(int socket_fd, char data[])
 	ret = recvmsg(socket_fd, &msg_hdr, 0);
 	if (ret < 0) {
         perror("client recvmsg");
+        free(nlh);
 		return ret;
 	}
 	//printf("Received message from kernel: %s", (char *)NLMSG_DATA(nlh));
@@ -190,6 +201,7 @@ int read_event(int socket_fd, char data[])
     #endif
 
 	free(nlh);
+    return ret;
 }
 
 
