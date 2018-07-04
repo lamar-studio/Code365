@@ -1,0 +1,29 @@
+#博文参考链接：https://blog.csdn.net/jxgz_leo/article/details/53458366
+########################################################################
+
+## 静态链接
+1. 编译方法
+  - gcc -g -rdynamic backtrace.c add.c dump.c -o backtrace
+
+2. 执行结果样式
+
+
+3. 问题定位方法
+
+
+
+
+
+## 动态链接
+1. 编译方法
+  - gcc -g -rdynamic add.c -fPIC -shared -o libadd.so                       /* 编译生成libadd.so */
+  - gcc -g -rdynamic backtrace.c dump.c -L. -ladd -Wl,-rpath=. -o backtrace /* 编译生成backtrace可执行文件 */ 
+
+2. 执行结果样式
+
+
+3. 问题定位方法
+
+
+
+
