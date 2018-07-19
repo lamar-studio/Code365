@@ -1,16 +1,3 @@
-/*
- * Copyright(C) 2014 Ruijie Network. All rights reserved.
- */
-
-/*
- * set_resolution.c
- * Original Author: linmingjia@ruijie.com.cn, 2014-12-02
- *
- * 设置分辨率数据写入vendor区域
- *
- *  History
- *
- */
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,9 +1,3 @@
-/*
- * gl_rgbatex.h
- *
- *  Created on: 2017-3-13
- *      Author: linmingjia@ruijie.com.cn
- */
 
 #ifndef  _GL_RGBTEX_H_
 #define _GL_RGBTEX_H_

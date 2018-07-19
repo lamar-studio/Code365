@@ -1,9 +1,3 @@
-/*
- * gl_rgbatex.cpp
- *
- *  Created on: 2017-3-13
- *      Author: linmingjia@ruijie.com.cn
- */
 
 #include <stdlib.h>
 #include <stdio.h>
