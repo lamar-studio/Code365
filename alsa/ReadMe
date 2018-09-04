@@ -1,0 +1,15 @@
+
+alsa-lib编程注意事项：
+1. 包含头文件asoundlib.h
+2. Makefile里需要指定共享库的路径，如：-L/usr/lib/alsa/lib
+3. 编译选项里需要添加 -lasound 动态库选项
+
+
+alsa-lib的安装：
+1. ./configure --prefix       指定一下安装路径
+2. 安装完之后，在makefile里指定对应的路径
+
+
+
+
+

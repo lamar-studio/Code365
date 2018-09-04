@@ -12,11 +12,12 @@ int main()
 {
     printf("start the program:\n");
     printf("INFO:%s\n", ALSA_LIB_VERSION);
+    printf("\n=============================================\n");
 
-    sound_init();
-    sound_playback(g_playback_info);
-    sound_close(g_playback_info);
+    ctl_config_list();
+    pcm_config_list();
 
+    printf("\n=============================================\n");
     printf("exit the program.\n");
 
     return 0;

@@ -14,7 +14,7 @@ OBJ = $(SRC:.c=.o)
 #####  ±‡“Î—°œÓ  #####
 CC   	?= gcc
 INCLUDE  = -I. -I./include
-CFLAGS  += -fPIC -Wall -Wextra -ansi -pedantic -std=c99 -lasound
+CFLAGS  += -fPIC -ansi -pedantic -std=c99 -lasound
 SHARE_LIB = -L/usr/lib/alsa/lib
 
 ifndef DEBUG

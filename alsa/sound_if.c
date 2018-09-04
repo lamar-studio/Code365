@@ -1,5 +1,7 @@
 
 
+#include <alsa/mixer.h>
+#include <unistd.h>
 #include "sound_if.h"
 
 #define DEFAULT_SAMPLERATE     (44100)
@@ -11,7 +13,9 @@
 
 #define RECORD_FRAME_SIZE      (64)
 #define PLAYBACK_FRAME_SIZE    (1024)
-#define SOUND_RECORD_FILE      ("/home/lamar/Music/fenjxc.wav")
+#define SOUND_RECORD_FILE      ("/home/lamar/Music/capture.wav")
+#define SOUND_RECORD_FILE_SIZE (20)              //单位为 M
+#define SOUND_PLAYBACK_FILE    ("/home/lamar/Music/playback.wav")
 
 #define SOUND_RECORD_START     (1)
 #define SOUND_PLAYBACK_START   (2)
@@ -69,6 +73,36 @@ static int read_local_data(char* filename, char* buf, int size)
 	fclose(infile);
 	return SUCCESS;
 }
+
+static int capture_data(const void *buffer, size_t bytes, int Msize, const char *path)
+{
+    static FILE* fd = NULL;
+    static int offset = 0;
+
+    if (fd == NULL) {
+        fd = fopen(path, "wb+");
+        if (fd == NULL) {
+            printf("DEBUG open %s error = %d", path, errno);
+            offset = 0;
+        }
+    }
+    fwrite(buffer,bytes,1,fd);
+    offset += bytes;
+    fflush(fd);
+    if (offset >= Msize*1024*1024) {
+        Msize = 0;
+        fclose(fd);
+        fd = NULL;
+        offset = 0;
+        printf("playback pcmfile end");
+
+        return 1;
+    }
+
+    return 0;
+}
+
+
 
 
 int sound_init()
@@ -130,20 +164,21 @@ int sound_open(SND_INFO_T *info)
         return result;
     }
 
-    /* Allocate a hardware parameters object. */
+    /* Allocate a hardware parameters object. 分配一个硬件参数实体 */
     if ((err = snd_pcm_hw_params_malloc(&hw_params)) < 0) {
         printf("cannot allocate hardware parameter structure %s \n",
                   snd_strerror(err));
         goto ERROR;
     }
 
-    /* Fill it in with default values. */
+    /* Fill it in with default values. 初始化硬件的默认参数 */
     if ((err = snd_pcm_hw_params_any(info->pcm, hw_params)) < 0) {
         printf("cannot initialize hardware parameter structure %s \n",
                   snd_strerror(err));
         goto ERROR;
     }
 
+    //修改硬件中的特定参数
     /* Interleaved mode */
     if ((err = snd_pcm_hw_params_set_access(info->pcm, hw_params,
                                             SND_PCM_ACCESS_RW_INTERLEAVED)) < 0) {
@@ -175,6 +210,7 @@ int sound_open(SND_INFO_T *info)
         goto ERROR;
     }
 
+    //更新硬件参数到驱动
     /* Write the parameters to the driver */
     if ((err = snd_pcm_hw_params(info->pcm, hw_params)) < 0) {
         printf("cannot set parameters %s \n", snd_strerror(err));
@@ -253,14 +289,9 @@ int sound_playback(SND_INFO_T *playback)
         goto err;
     }
 
-    if ((playback->samplearate != g_record_info->samplearate) ||
-            (playback->channels != g_record_info->channels) ||
-            (playback->format != g_record_info->format)) {
-        printf("playback params is different from record params!");
-        goto err;
-    }
-
+    //帧转换成字节
     int buffer_size = snd_pcm_frames_to_bytes(playback->pcm, playback->period_size);
+    printf("%d:buffer_size:%d", __LINE__, buffer_size);
 
     buf = (unsigned char *)malloc(buffer_size);
     if (buf == NULL) {
@@ -286,6 +317,7 @@ int sound_playback(SND_INFO_T *playback)
             break;
         }
 
+        //一个周期一个周期地写入数据
         write_frame = snd_pcm_writei(playback->pcm, buf, playback->period_size);
         if (write_frame < 0) {
             printf("pcm write errno=%d \n", errno);
@@ -316,26 +348,16 @@ err:
 int sound_capture(SND_INFO_T *capture)
 {
     int               ret       = 0;
-    int               retry_cnt = 80;
-    int               loop_cnt  = 100;
-    unsigned char          *buf       = NULL;
+    unsigned char    *buf       = NULL;
     snd_pcm_sframes_t recv_len  = 0;
 
-    while (retry_cnt) {
-        ret = sound_open(capture);
-        if (FAIL == ret) {
-            if (--retry_cnt < 0) {
-                printf("record thread init failed \n");
-                goto err;
-            }
-            printf("record thread init failed, retry... \n");
-            usleep(200000);
-        } else {
-            capture->status = 1;
-            break;
-        }
+    ret = sound_open(capture);
+    if (FAIL == ret) {
+        printf("record thread init failed\n");
+        goto err;
     }
 
+    //帧转换成字节
     int buffer_size = snd_pcm_frames_to_bytes(capture->pcm, capture->period_size);
 
     buf = (unsigned char *)malloc(buffer_size);
@@ -344,9 +366,9 @@ int sound_capture(SND_INFO_T *capture)
         goto err;
     }
 
-    while (loop_cnt) {
-        loop_cnt--;
+    while (1) {
         memset(buf, 0x00, buffer_size);
+        //一个周期一个周期地读数据，需要把帧转换成字节
         recv_len = snd_pcm_readi(capture->pcm, buf, capture->period_size);
         if (recv_len < 0) {
             printf("pcm readi errno=%d \n", errno);
@@ -359,9 +381,11 @@ int sound_capture(SND_INFO_T *capture)
         }
 
         if (recv_len == capture->period_size) {
-            write_local_data(SOUND_RECORD_FILE, "a+", buf, buffer_size);
+            //保存录音文件,超过SOUND_RECORD_FILE_SIZE大小时，退出循环
+            if (capture_data(buf, buffer_size, SOUND_RECORD_FILE_SIZE, SOUND_RECORD_FILE) != 0)
+                break;
         } else {
-            printf("read size not period_size : %d", recv_len);
+            printf("read size not period_size : %ld", recv_len);
         }
     }
 
@@ -375,12 +399,9 @@ err:
 }
 
 
-
-
-void config_list()
+void pcm_config_list()
 {
     int val;
-    snd_pcm_t *handle;
 
     printf("ALSA library version: %s\n", SND_LIB_VERSION_STR);
 
@@ -409,10 +430,85 @@ void config_list()
 }
 
 
+void ctl_config_list()
+{
+    snd_mixer_t *mixer_fd;
+    snd_mixer_elem_t* elem = NULL;
+    const char *card = "default";
+
+    ret = snd_mixer_open(&mixer_fd, 0);
+    if (ret < 0) {
+        LOG_ERROR("open mixer failed ret=%d\n", ret);
+        return;
+    }
+
+    ret = snd_mixer_attach(mixer_fd, card);
+    if (ret < 0) {
+        snd_mixer_close(mixer_fd);
+        LOG_ERROR("attach mixer failed ret=%d\n", ret);
+        return;
+    }
+
+    ret = snd_mixer_selem_register(mixer_fd, NULL, NULL);
+    if (ret < 0) {
+        snd_mixer_close(mixer_fd);
+        LOG_ERROR("register mixer failed ret=%d \n", ret);
+        return;
+    }
+
+    ret = snd_mixer_load(mixer_fd);
+
+    if (ret < 0) {
+        snd_mixer_close(mixer_fd);
+        LOG_ERROR("load mixer failed ret=%d \n", ret);
+        return;
+    }
 
 
+    for (elem = snd_mixer_first_elem(mixer_fd); elem;
+        elem = snd_mixer_elem_next(elem)) {
+        name = snd_mixer_selem_get_name(elem);
+        printf("name=%s \n", name);
+    }
+}
 
 
+void SetAlsaMasterVolume(long volume)
+{
+    long min, max;
+    int lvol=0, rvol=0, maxvol=70;
+
+    snd_mixer_t *handle;
+    snd_mixer_selem_id_t *sid;
+    const char *card = "default";
+    const char *selem_name = "Line";
+
+    snd_mixer_open(&handle, 0);
+    snd_mixer_attach(handle, card);
+    snd_mixer_selem_register(handle, NULL, NULL);
+    snd_mixer_load(handle);
+
+    snd_mixer_selem_id_alloca(&sid);
+    snd_mixer_selem_id_set_index(sid, 0);
+    snd_mixer_selem_id_set_name(sid, selem_name);
+    snd_mixer_elem_t* elem = snd_mixer_find_selem(handle, sid);
+
+    snd_mixer_selem_get_playback_volume_range(elem, &min, &max);
+    printf("min=%i, max=%i\n", min, max);
+    snd_mixer_selem_set_playback_volume(elem, SND_MIXER_SCHN_FRONT_LEFT, maxvol * max / 100);
+    snd_mixer_selem_set_playback_volume(elem, SND_MIXER_SCHN_FRONT_RIGHT, maxvol * max / 100);
+    for (rvol=0;rvol<maxvol;rvol++) {
+        usleep(100000);
+        snd_mixer_selem_set_playback_volume(elem, SND_MIXER_SCHN_FRONT_RIGHT, rvol * max / 100);
+    }
+    for (lvol=maxvol;lvol>=0;lvol--) {
+        usleep(100000);
+        snd_mixer_selem_set_playback_volume(elem, SND_MIXER_SCHN_FRONT_LEFT, lvol * max / 100);
+    }
+    snd_mixer_selem_set_playback_volume(elem, SND_MIXER_SCHN_FRONT_LEFT, maxvol * max / 100);
+    snd_mixer_selem_set_playback_volume(elem, SND_MIXER_SCHN_FRONT_RIGHT, maxvol * max / 100);
+    snd_mixer_close(handle);
+}
 
 
 
