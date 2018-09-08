@@ -4,6 +4,8 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <cstring>
+#include <cstdlib>
 #include <map>
 
 #include "HWConfig.h"
@@ -64,7 +66,7 @@ bool HWConfig::getBoolValue(const char *key)
     const char *str = getStringValue(key);
 
     if (str == NULL) {
-        log("notfound for [%s]-[%s]", key);
+        cout<<"notfound:"<<key<<endl;
         return false;
     }
 
@@ -91,7 +93,7 @@ float HWConfig::getFloatValue(const char* key)
     const char *str = getStringValue(key);
 
     if(str == NULL) {
-        cout<<"notfound"<<endl;
+        cout<<"notfound:"<<key<<endl;
         return -1.0;
     }
 

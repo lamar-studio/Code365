@@ -4,22 +4,18 @@
 #ifndef __HWCONFIG_H
 #define __HWCONFIG_H
 
-#include<iostream>
-#include<fstream>
-#include<cstring>
-#include<string>
-#include<vector>
-#include<cstdlib>
 
+#include <fstream>
+#include <vector>
 
 #define SUCCESS   (0)
 #define FAIL      (-1)
 
-#define HWConfig_DEBUG 0
+#define DEBUG     (0)
 #define log(format, args...)  printf(format"\n", ##args)
 #define mlog(format, args...)                                 \
     do {                                                      \
-            if(HWConfig_DEBUG) printf(format"\n", ##args);    \
+            if(DEBUG) printf(format"\n", ##args);             \
         } while(0)
 
 using namespace std;

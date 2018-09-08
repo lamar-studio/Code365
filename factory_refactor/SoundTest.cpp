@@ -1,6 +1,8 @@
-
-
+/*
+ * Create by LaMar at 2018/09/05
+ */
 #include <alsa/asoundlib.h>
+#include <pthread.h>
 
 #include "HWConfig.h"
 #include "SoundTest.h"
@@ -18,9 +20,10 @@
 #define SOUND_RECORD_FILE      ("/tmp/factory_test/sound.wav")
 #define DEFAULT_CARD_NAME      ("default")
 
-static SND_INFO_T *g_record_info       = NULL;
-static SND_INFO_T *g_playback_info     = NULL;
+static SND_INFO_T *g_record_info = NULL;
+static SND_INFO_T *g_playback_info = NULL;
 static SND_STATUS_T gStatus =  SOUND_UNKNOW;
+static pthread_mutex_t gMutex;
 SoundTest* SoundTest::mInstance = NULL;
 
 static void initVolume()
@@ -29,8 +32,8 @@ static void initVolume()
     const char *name = NULL;
     long minVolume = 0;
     long maxVolume = 0;
-    snd_mixer_t* mixer_fd = NULL;
-    snd_mixer_elem_t* elem = NULL;
+    snd_mixer_t *mixer_fd = NULL;
+    snd_mixer_elem_t *elem = NULL;
 
     ret = snd_mixer_open(&mixer_fd, 0);
     if (ret < 0) {
@@ -69,7 +72,7 @@ static void initVolume()
             || (strcmp(name, "Mic") == 0)) {
             //set maxvolume
             ret = snd_mixer_selem_get_playback_volume_range(elem, &minVolume, &maxVolume);
-            mlog("name=%s get_playback_volume_range:%d min=%d max=%d\n", name, ret, minVolume, maxVolume);
+            mlog("name=%s get_playback_volume_range min=%ld max=%ld\n", name, minVolume, maxVolume);
             snd_mixer_selem_set_playback_switch_all(elem, 1);
             if (ret == 0) {
                 snd_mixer_selem_set_playback_volume_all(elem, maxVolume);
@@ -79,7 +82,7 @@ static void initVolume()
         } else if (strcmp(name, "Mic Boost") == 0) {
             //set minvolume
             ret = snd_mixer_selem_get_playback_volume_range(elem, &minVolume, &maxVolume);
-            mlog("name=%s get_playback_volume_range:%d min=%d max=%d\n", name, ret, minVolume, maxVolume);
+            mlog("name=%s get_playback_volume_range min=%ld max=%ld\n", name, minVolume, maxVolume);
             snd_mixer_selem_set_capture_switch_all(elem, 1);
             if (ret == 0) {
                 snd_mixer_selem_set_capture_volume_all(elem, minVolume);
@@ -88,7 +91,7 @@ static void initVolume()
             }
         } else if(strcmp(name, "Capture") == 0) {
             ret = snd_mixer_selem_get_capture_volume_range(elem, &minVolume, &maxVolume);
-            mlog("name=%s get_capture_volume_range:%d min=%d max=%d\n", name, ret, minVolume, maxVolume);
+            mlog("name=%s get_capture_volume_range min=%ld max=%ld\n", name, minVolume, maxVolume);
             snd_mixer_selem_set_capture_switch_all(elem, 1);
 
             if (ret == 0) {
@@ -102,11 +105,10 @@ static void initVolume()
     snd_mixer_close(mixer_fd);
 }
 
-
 static void *recordLoop(void *arg)
 {
-	int count = 0;
-	FILE * outfile = NULL;
+    int count = 0;
+    FILE * outfile = NULL;
 
     int ret = 0;
     SND_INFO_T *info = (SND_INFO_T *) arg;
@@ -129,7 +131,7 @@ static void *recordLoop(void *arg)
         memset(buf, 0x00, buffer_size);
         recv_len = snd_pcm_readi(info->pcm, buf, info->period_size);
         if (recv_len < 0) {
-            mlog("pcm readi errno=%d \n", errno);
+            mlog("pcm readi errno=%s \n", snd_strerror(errno));
             if (recv_len == -EPIPE) {
                 snd_pcm_prepare(info->pcm);
             } else {
@@ -152,7 +154,7 @@ static void *recordLoop(void *arg)
             fflush(outfile);
             fclose(outfile);
         } else {
-            mlog("read size not period_size : %d", recv_len);
+            mlog("read size not period_size:%ld", recv_len);
         }
     }
 
@@ -212,7 +214,7 @@ static void *playbackLoop(void *arg)
 
         write_frame = snd_pcm_writei(info->pcm, buf, info->period_size);
         if (write_frame < 0) {
-            mlog("pcm write errno=%d \n", errno);
+            mlog("pcm write errno=%s \n", snd_strerror(errno));
             if (write_frame == -EPIPE) {
                 snd_pcm_prepare(info->pcm);
             } else {
@@ -240,7 +242,6 @@ err_playback:
 SoundTest::SoundTest()
 {
     init();
-    initVolume();
 }
 
 SoundTest::~SoundTest()
@@ -267,7 +268,7 @@ int SoundTest::openSoundCard(SND_INFO_T *info)
     int channels    = info->channels;
     snd_pcm_format_t format       = info->format;;
     snd_pcm_uframes_t period_size = info->period_size;
-    snd_pcm_hw_params_t* hw_params = NULL;
+    snd_pcm_hw_params_t *hw_params = NULL;
 
     mlog("open audio device %s\n", info->card);
 
@@ -350,15 +351,15 @@ int SoundTest::openSoundCard(SND_INFO_T *info)
         goto err;
     }
 
-    info->samplearate 	= sample_rate;
-    info->channels 		= channels;
-    info->format 		= format;
-    info->period_size 	= period_size;
+    info->samplearate = sample_rate;
+    info->channels    = channels;
+    info->format      = format;
+    info->period_size = period_size;
 
     result = SUCCESS;
 
-    mlog("set hardware params success samplarate : %d, channels : %d, format : 0x%x, period_size : %d \n",
-              sample_rate, channels, format, period_size);
+    mlog("set hardware params success samplarate:%d,channels:%d,format:0x%x,period_size:%ld \n",
+         sample_rate, channels, format, period_size);
 
 err:
     if (result == FAIL) {
@@ -391,9 +392,15 @@ bool SoundTest::startRecord()
     }
     pthread_t pid_t;
 
-    mlog("sound test record start \n");
+    if (openSoundCard(g_record_info) != SUCCESS) {
+        mlog("openSoundCardit fail");
+        return FAIL;
+    }
+
+    mlog("sound test record start");
+    pthread_mutex_lock(&gMutex);
     gStatus = SOUND_RECORD_START;
-    openSoundCard(g_record_info);
+    pthread_mutex_unlock(&gMutex);
 
     pthread_create(&pid_t, NULL, recordLoop, g_record_info);
 
@@ -405,8 +412,11 @@ bool SoundTest::stopRecord()
     if (SOUND_RECORD_STOP == gStatus) {
         return FAIL;
     }
+
+    pthread_mutex_lock(&gMutex);
     gStatus = SOUND_RECORD_STOP;
-    mlog("sound test record stop \n");
+    pthread_mutex_unlock(&gMutex);
+    mlog("sound test record stop");
 
     return SUCCESS;
 }
@@ -414,14 +424,20 @@ bool SoundTest::stopRecord()
 bool SoundTest::startPlayback()
 {
     if (!g_record_info || SOUND_PLAYBACK_START == gStatus) {
-        mlog("it is not ready to playback \n");
+        mlog("it is not ready to playback");
         return FAIL;
     }
     pthread_t pid_t;
 
-    mlog("sound test playback start \n");
+    if (openSoundCard(g_playback_info) != SUCCESS) {
+        mlog("openSoundCardit fail");
+        return FAIL;
+    }
+
+    mlog("sound test playback start");
+    pthread_mutex_lock(&gMutex);
     gStatus = SOUND_PLAYBACK_START;
-    openSoundCard(g_playback_info);
+    pthread_mutex_unlock(&gMutex);
 
     pthread_create(&pid_t, NULL, playbackLoop, g_playback_info);
 
@@ -433,8 +449,11 @@ bool SoundTest::stopPlayback()
     if (SOUND_PLAYBACK_STOP == gStatus) {
         return FAIL;
     }
+
+    pthread_mutex_lock(&gMutex);
     gStatus = SOUND_PLAYBACK_STOP;
-    mlog("sound test playback stop \n");
+    pthread_mutex_unlock(&gMutex);
+    mlog("sound test playback stop");
 
     return SUCCESS;
 }
@@ -447,11 +466,11 @@ bool SoundTest::init()
     }
 
     memset(g_record_info, 0, sizeof(SND_INFO_T));
-    g_record_info->samplearate 	= DEFAULT_SAMPLERATE;
-    g_record_info->channels 	= DEFAULT_CHANNEL;
-    g_record_info->format 		= DEFAULT_FORMAT;
-    g_record_info->period_size 	= RECORD_FRAME_SIZE;
-    g_record_info->direction 	= RECORD;
+    g_record_info->samplearate  = DEFAULT_SAMPLERATE;
+    g_record_info->channels     = DEFAULT_CHANNEL;
+    g_record_info->format       = DEFAULT_FORMAT;
+    g_record_info->period_size  = RECORD_FRAME_SIZE;
+    g_record_info->direction    = RECORD;
     g_record_info->pcm          = NULL;
     g_record_info->card         = DEFAULT_CARD_NAME;
 
@@ -461,10 +480,10 @@ bool SoundTest::init()
     }
 
     memset(g_playback_info, 0, sizeof(SND_INFO_T));
-    g_playback_info->samplearate	= DEFAULT_SAMPLERATE;
+    g_playback_info->samplearate    = DEFAULT_SAMPLERATE;
     g_playback_info->channels       = DEFAULT_CHANNEL;
     g_playback_info->format         = DEFAULT_FORMAT;
-    g_playback_info->period_size	= PLAYBACK_FRAME_SIZE;
+    g_playback_info->period_size    = PLAYBACK_FRAME_SIZE;
     g_playback_info->direction      = PLAYBACK;
     g_playback_info->pcm            = NULL;
     g_playback_info->card           = DEFAULT_CARD_NAME;
@@ -484,14 +503,13 @@ bool SoundTest::init()
     }
 #endif
 
-    gStatus = SOUND_PLAYBACK_STOP;
+    if (pthread_mutex_init(&gMutex, NULL) != 0) {
+        return FAIL;
+    }
+    gStatus = SOUND_UNKNOW;
+
+    initVolume();
 
     return SUCCESS;
 }
-
-void SoundTest::info()
-{
-
-}
-
 

@@ -4,12 +4,6 @@
 #ifndef __SOUND_TEST_H
 #define __SOUND_TEST_H
 
-#include <iostream>
-#include <fstream>
-#include <cstring>
-#include <string>
-#include <vector>
-#include <cstdlib>
 #include <alsa/asoundlib.h>
 
 using namespace std;
