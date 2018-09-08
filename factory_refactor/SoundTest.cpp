@@ -197,6 +197,7 @@ static void *playbackLoop(void *arg)
     }
 
     while (gStatus == SOUND_PLAYBACK_START) {
+        mlog("in the playbackLoop");
         memset(buf, 0x00, buffer_size);
         ret = fread(buf, buffer_size, 1, infile);
         if (ret == 0) {

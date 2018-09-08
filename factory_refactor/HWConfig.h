@@ -15,7 +15,7 @@
 #define SUCCESS   (0)
 #define FAIL      (-1)
 
-#define HWConfig_DEBUG 1
+#define HWConfig_DEBUG 0
 #define log(format, args...)  printf(format"\n", ##args)
 #define mlog(format, args...)                                 \
     do {                                                      \
