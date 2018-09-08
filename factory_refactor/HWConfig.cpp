@@ -53,7 +53,7 @@ void HWConfig::loadHwConfigInfo()
         entry.key = str.substr(0, idx);
         entry.val = str.substr(idx+1, str.length()-idx-1);
         cfgInfos.push_back(entry);
-        mlog("last add entry: key@[%s]\t val@[%s]\t buf@[%s]", entry.key.c_str(), entry.val.c_str());
+        mlog("last add entry: key@[%s]\t val@[%s]", entry.key.c_str(), entry.val.c_str());
     }
 
 }

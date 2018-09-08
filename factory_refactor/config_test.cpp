@@ -22,10 +22,16 @@ int main()
 
     delete ini;
 
-    SoundTest *sound = new SoundTest();
+    SoundTest::getInstance()->startRecord();
+    sleep(3);
+    SoundTest::getInstance()->stopRecord();
+    sleep(1);
+    // sleep(1);
+    // SoundTest::getInstance()->startPlayback();
+    // sleep(3);
+    // SoundTest::getInstance()->stopPlayback();
 
-
-
+    cout<<"end of the test.\t"<<mem<<endl;
     return 0;
 }
 

@@ -15,17 +15,13 @@
 #define RECORD_FRAME_SIZE      (64)
 #define PLAYBACK_FRAME_SIZE    (1024)
 
-#define SOUND_RECORD_START     (0)
-#define SOUND_RECORD_STOP      (1)
-#define SOUND_PLAYBACK_START   (2)
-#define SOUND_PLAYBACK_STOP    (3)
-
 #define SOUND_RECORD_FILE      ("/tmp/factory_test/sound.wav")
-#define DEFAULT_CARD_NAME        ("default")
+#define DEFAULT_CARD_NAME      ("default")
 
-SND_INFO_T *g_record_info       = NULL;
-SND_INFO_T *g_playback_info     = NULL;
-int         g_status            = SOUND_PLAYBACK_STOP;
+static SND_INFO_T *g_record_info       = NULL;
+static SND_INFO_T *g_playback_info     = NULL;
+static SND_STATUS_T gStatus =  SOUND_UNKNOW;
+SoundTest* SoundTest::mInstance = NULL;
 
 static void initVolume()
 {
@@ -107,9 +103,137 @@ static void initVolume()
 }
 
 
+static void *recordLoop(void *arg)
+{
+	int count = 0;
+	FILE * outfile = NULL;
 
+    int ret = 0;
+    SND_INFO_T *info = (SND_INFO_T *) arg;
+    snd_pcm_sframes_t recv_len = 0;
+    int retry_cnt = 80;
+    char *buf = NULL;
+    int buffer_size = 0;
 
+    pthread_detach(pthread_self());
 
+    buffer_size = snd_pcm_frames_to_bytes(info->pcm, info->period_size);
+    buf = (char *)malloc(buffer_size);
+    if (buf == NULL) {
+        mlog("malloc sound buffer failed! \n");
+        goto err_record;
+    }
+
+    while (gStatus == SOUND_RECORD_START) {
+        mlog("in the recordLoop");
+        memset(buf, 0x00, buffer_size);
+        recv_len = snd_pcm_readi(info->pcm, buf, info->period_size);
+        if (recv_len < 0) {
+            mlog("pcm readi errno=%d \n", errno);
+            if (recv_len == -EPIPE) {
+                snd_pcm_prepare(info->pcm);
+            } else {
+                snd_pcm_recover(info->pcm, recv_len, 1);
+            }
+            continue;
+        }
+        if (recv_len == info->period_size) {
+            if ((outfile = fopen(SOUND_RECORD_FILE, "a+")) == NULL) {
+                mlog("can't open %s\n", SOUND_RECORD_FILE);
+                break;
+            }
+
+            count = fwrite(buf, buffer_size, 1, outfile);
+            if (count != 1) {
+                mlog("write data failed file=%s count=%d size=%d\n", SOUND_RECORD_FILE, count, buffer_size);
+                fclose(outfile);
+                break;
+            }
+            fflush(outfile);
+            fclose(outfile);
+        } else {
+            mlog("read size not period_size : %d", recv_len);
+        }
+    }
+
+    mlog("exit the recordLoop");
+err_record:
+    if (buf != NULL) {
+        free(buf);
+        buf = NULL;
+    }
+    SoundTest::getInstance()->closeSoundCard(info);
+}
+
+static void *playbackLoop(void *arg)
+{
+    int ret = 0;
+    SND_INFO_T *info = (SND_INFO_T *)arg;
+    FILE *infile = NULL;
+    snd_pcm_sframes_t write_frame;
+    char *buf = NULL;
+    int buffer_size = 0;
+
+    pthread_detach(pthread_self());
+
+    if ((info->samplearate != g_record_info->samplearate)
+        || (info->channels != g_record_info->channels)
+        || (info->format != g_record_info->format)) {
+        mlog("playback params is different from record params!");
+        goto err_playback;
+    }
+
+    buffer_size = snd_pcm_frames_to_bytes(info->pcm, info->period_size);
+
+    buf = (char *)malloc(buffer_size);
+    if (buf == NULL) {
+        mlog("malloc sound buffer failed! \n");
+        goto err_playback;
+    }
+
+    if ((infile = fopen(SOUND_RECORD_FILE, "r")) == NULL) {
+        mlog("can't open %s\n", SOUND_RECORD_FILE);
+        goto err_playback;
+    }
+
+    while (gStatus == SOUND_PLAYBACK_START) {
+        memset(buf, 0x00, buffer_size);
+        ret = fread(buf, buffer_size, 1, infile);
+        if (ret == 0) {
+            mlog("read end of file \n");
+            break;
+        }
+
+        if (!info->pcm) {
+            mlog("sound pcm not init! \n");
+            break;
+        }
+
+        write_frame = snd_pcm_writei(info->pcm, buf, info->period_size);
+        if (write_frame < 0) {
+            mlog("pcm write errno=%d \n", errno);
+            if (write_frame == -EPIPE) {
+                snd_pcm_prepare(info->pcm);
+            } else {
+                snd_pcm_recover(info->pcm, write_frame, 1);
+            }
+            continue;
+        }
+    }
+
+err_playback:
+    if (infile != NULL) {
+        fclose(infile);
+        infile = NULL;
+    }
+
+    if (buf != NULL) {
+        free(buf);
+        buf = NULL;
+    }
+    SoundTest::getInstance()->closeSoundCard(info);
+    remove(SOUND_RECORD_FILE);
+}
 
 
 SoundTest::SoundTest()
@@ -121,6 +245,15 @@ SoundTest::SoundTest()
 SoundTest::~SoundTest()
 {
 
+}
+
+SoundTest* SoundTest::getInstance()
+{
+    if (mInstance == NULL) {
+        mInstance = new SoundTest();
+    }
+
+    return mInstance;
 }
 
 int SoundTest::openSoundCard(SND_INFO_T *info)
@@ -246,196 +379,32 @@ void SoundTest::closeSoundCard(SND_INFO_T *info)
         snd_pcm_close(info->pcm);
         info->pcm = NULL;
     }
+    mlog("closeSoundCard");
 }
-
-void SoundTest::playbackLoop(void *arg)
-{
-    int ret = 0;
-    SND_INFO_T *info = (SND_INFO_T *)arg;
-    FILE *infile = NULL;
-    snd_pcm_sframes_t write_frame;
-    char *buf = NULL;
-    int buffer_size = 0;
-
-    pthread_detach(pthread_self());
-
-    ret = openSoundCard(info);
-    if (FAIL == ret) {
-        mlog("record thread init failed\n");
-        goto err_playback;
-    }
-
-    if ((info->samplearate != g_record_info->samplearate)
-        || (info->channels != g_record_info->channels)
-        || (info->format != g_record_info->format)) {
-        mlog("playback params is different from record params!");
-        goto err_playback;
-    }
-
-    buffer_size = snd_pcm_frames_to_bytes(info->pcm, info->period_size);
-
-    buf = (char *)malloc(buffer_size);
-    if (buf == NULL) {
-        mlog("malloc sound buffer failed! \n");
-        goto err_playback;
-    }
-
-    if ((infile = fopen(SOUND_RECORD_FILE, "r")) == NULL) {
-        mlog("can't open %s\n", SOUND_RECORD_FILE);
-        goto err_playback;
-    }
-
-    while (1) {
-        if (SOUND_PLAYBACK_START != g_status) {
-            mlog("eixt the playback loop:%d", g_status);
-            break;
-        }
-
-        memset(buf, 0x00, buffer_size);
-        ret = fread(buf, buffer_size, 1, infile);
-        if (ret == 0) {
-            mlog("read end of file \n");
-            break;
-        }
-
-        if (!info->pcm) {
-            mlog("sound pcm not init! \n");
-            break;
-        }
-
-        write_frame = snd_pcm_writei(info->pcm, buf, info->period_size);
-        if (write_frame < 0) {
-            mlog("pcm write errno=%d \n", errno);
-            if (write_frame == -EPIPE) {
-                snd_pcm_prepare(info->pcm);
-            } else {
-                snd_pcm_recover(info->pcm, write_frame, 1);
-            }
-            continue;
-        }
-    }
-
-    g_status = SOUND_PLAYBACK_STOP;
-    closeSoundCard(g_playback_info);
-
-err_playback:
-    if (infile != NULL) {
-        fclose(infile);
-        infile = NULL;
-    }
-
-    if (buf != NULL) {
-        free(buf);
-        buf = NULL;
-    }
-    remove(SOUND_RECORD_FILE);
-}
-
-void SoundTest::recordLoop(void *arg)
-{
-	int count = 0;
-	FILE * outfile = NULL;
-
-    int ret = 0;
-    SND_INFO_T *info = (SND_INFO_T *) arg;
-    snd_pcm_sframes_t recv_len = 0;
-    int retry_cnt = 80;
-    char *buf = NULL;
-    int buffer_size = 0;
-
-    pthread_detach(pthread_self());
-
-    while (retry_cnt) {
-        ret = openSoundCard(info);
-        if (FAIL == ret) {
-            if (--retry_cnt < 0) {
-                mlog("record thread init failed \n");
-                goto err_record;
-            }
-            mlog("record thread init failed, retry... \n");
-            usleep(200000);
-        } else {
-            info->status = 1;
-            break;
-        }
-    }
-
-    buffer_size = snd_pcm_frames_to_bytes(info->pcm, info->period_size);
-
-    buf = (char *)malloc(buffer_size);
-    if (buf == NULL) {
-        mlog("malloc sound buffer failed! \n");
-        goto err_record;
-    }
-
-    while (1) {
-        if (SOUND_RECORD_START != g_status) {
-            mlog("eixt the record loop: %d \n", g_status);
-            break;
-        }
-
-        memset(buf, 0x00, buffer_size);
-        recv_len = snd_pcm_readi(info->pcm, buf, info->period_size);
-        if (recv_len < 0) {
-            mlog("pcm readi errno=%d \n", errno);
-            if (recv_len == -EPIPE) {
-                snd_pcm_prepare(info->pcm);
-            } else {
-                snd_pcm_recover(info->pcm, recv_len, 1);
-            }
-            continue;
-        }
-
-        if (recv_len == info->period_size) {
-            if ((outfile = fopen(SOUND_RECORD_FILE, "a+")) == NULL) {
-                mlog("can't open %s\n", SOUND_RECORD_FILE);
-                return FAIL;
-            }
-
-            count = fwrite(buf, buffer_size, 1, outfile);
-            if (count != 1) {
-                mlog("write data failed file=%s count=%d size=%d\n", SOUND_RECORD_FILE, count, buffer_size);
-                fclose(outfile);
-                return FAIL;
-            }
-
-            fflush(outfile);
-            fclose(outfile);
-        } else {
-            mlog("read size not period_size : %d", recv_len);
-        }
-    }
-
-err_record:
-    if (buf != NULL) {
-        free(buf);
-        buf = NULL;
-    }
-    closeSoundCard(g_record_info);
-}
-
 
 bool SoundTest::startRecord()
 {
-    if (!g_record_info || SOUND_RECORD_START == g_status) {
+    if (!g_record_info || SOUND_RECORD_START == gStatus) {
         mlog("it is not ready to record \n");
         return FAIL;
     }
-    g_status = SOUND_RECORD_START;
-    mlog("sound test record start \n");
-
     pthread_t pid_t;
-    pthread_create(&pid_t, NULL, (void *)&recordLoop, g_record_info);
+
+    mlog("sound test record start \n");
+    gStatus = SOUND_RECORD_START;
+    openSoundCard(g_record_info);
+
+    pthread_create(&pid_t, NULL, recordLoop, g_record_info);
 
     return SUCCESS;
 }
 
 bool SoundTest::stopRecord()
 {
-    if (SOUND_RECORD_STOP == g_status) {
+    if (SOUND_RECORD_STOP == gStatus) {
         return FAIL;
     }
-    g_status = SOUND_RECORD_STOP;
+    gStatus = SOUND_RECORD_STOP;
     mlog("sound test record stop \n");
 
     return SUCCESS;
@@ -443,26 +412,27 @@ bool SoundTest::stopRecord()
 
 bool SoundTest::startPlayback()
 {
-    if (!g_record_info || SOUND_PLAYBACK_START == g_status) {
+    if (!g_record_info || SOUND_PLAYBACK_START == gStatus) {
         mlog("it is not ready to playback \n");
         return FAIL;
     }
-
-    g_status = SOUND_PLAYBACK_START;
-    mlog("sound test playback start \n");
-
     pthread_t pid_t;
-    pthread_create(&pid_t, NULL, (void *)&playbackLoop, g_playback_info);
+
+    mlog("sound test playback start \n");
+    gStatus = SOUND_PLAYBACK_START;
+    openSoundCard(g_playback_info);
+
+    pthread_create(&pid_t, NULL, playbackLoop, g_playback_info);
 
     return SUCCESS;
 }
 
 bool SoundTest::stopPlayback()
 {
-    if (SOUND_PLAYBACK_STOP == g_status) {
+    if (SOUND_PLAYBACK_STOP == gStatus) {
         return FAIL;
     }
-    g_status = SOUND_PLAYBACK_STOP;
+    gStatus = SOUND_PLAYBACK_STOP;
     mlog("sound test playback stop \n");
 
     return SUCCESS;
@@ -513,7 +483,7 @@ bool SoundTest::init()
     }
 #endif
 
-    g_status = SOUND_PLAYBACK_STOP;
+    gStatus = SOUND_PLAYBACK_STOP;
 
     return SUCCESS;
 }

@@ -19,14 +19,21 @@ typedef struct tagSndInfo {
     int channels;
     int period_size;
     snd_pcm_format_t format;
-
-    int direction;
-    char* card;
+    snd_pcm_stream_t direction;
+    const char* card;
 
     snd_pcm_t* pcm;
 
     int status;
 } SND_INFO_T;
+
+typedef enum tagSndStatus {
+    SOUND_RECORD_START = 0,
+    SOUND_RECORD_STOP,
+    SOUND_PLAYBACK_START,
+    SOUND_PLAYBACK_STOP,
+    SOUND_UNKNOW
+} SND_STATUS_T;
 
 
 class SoundTest
@@ -35,8 +42,8 @@ public:
     SoundTest();
     ~SoundTest();
 
+    static SoundTest* getInstance();
     bool init();
-
     int openSoundCard(SND_INFO_T *info);
     void closeSoundCard(SND_INFO_T *info);
 
@@ -46,14 +53,11 @@ public:
     bool startRecord();
     bool stopRecord();
 
-    void playbackLoop(void *arg);
-    void recordLoop(void *arg);
-
     void testAll();
     void info();
 
 private:
-    void loadHwConfigInfo();
+    static SoundTest *mInstance;
 };
 
 #endif // __SOUND_TEST_H
