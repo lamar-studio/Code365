@@ -1,6 +1,6 @@
 target=test.out
-$(target): HWConfig.cpp HWConfig.h SoundTest.cpp SoundTest.h config_test.cpp
-	g++ -g HWConfig.cpp SoundTest.cpp config_test.cpp -o $(target) -lasound -lpthread
+$(target): HWConfig.cpp HWConfig.h SoundTest.cpp SoundTest.h test.cpp
+	g++ -g HWConfig.cpp SoundTest.cpp test.cpp -o $(target) -lasound -lpthread
 run:$(target)
 	./test.out
 clean:

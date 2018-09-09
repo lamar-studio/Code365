@@ -112,12 +112,18 @@ static void *recordLoop(void *arg)
 
     int ret = 0;
     SND_INFO_T *info = (SND_INFO_T *) arg;
-    snd_pcm_sframes_t recv_len = 0;
     int retry_cnt = 80;
     char *buf = NULL;
     int buffer_size = 0;
+    snd_pcm_sframes_t recv_len = 0;
 
     pthread_detach(pthread_self());
+
+    ret = SoundTest::getInstance()->openSoundCard(info);
+    if (ret != SUCCESS) {
+        mlog("openSoundCardit fail");
+        return NULL;
+    }
 
     buffer_size = snd_pcm_frames_to_bytes(info->pcm, info->period_size);
     buf = (char *)malloc(buffer_size);
@@ -165,6 +171,8 @@ err_record:
         buf = NULL;
     }
     SoundTest::getInstance()->closeSoundCard(info);
+
+    return NULL;
 }
 
 static void *playbackLoop(void *arg)
@@ -177,6 +185,12 @@ static void *playbackLoop(void *arg)
     int buffer_size = 0;
 
     pthread_detach(pthread_self());
+
+    ret = SoundTest::getInstance()->openSoundCard(info);
+    if (ret != SUCCESS) {
+        mlog("openSoundCardit fail");
+        return NULL;
+    }
 
     if ((info->samplearate != g_record_info->samplearate)
         || (info->channels != g_record_info->channels)
@@ -236,6 +250,8 @@ err_playback:
     }
     SoundTest::getInstance()->closeSoundCard(info);
     remove(SOUND_RECORD_FILE);
+
+    return NULL;
 }
 
 
@@ -392,16 +408,11 @@ bool SoundTest::startRecord()
     }
     pthread_t pid_t;
 
-    if (openSoundCard(g_record_info) != SUCCESS) {
-        mlog("openSoundCardit fail");
-        return FAIL;
-    }
-
-    mlog("sound test record start");
     pthread_mutex_lock(&gMutex);
     gStatus = SOUND_RECORD_START;
     pthread_mutex_unlock(&gMutex);
 
+    mlog("sound test record start");
     pthread_create(&pid_t, NULL, recordLoop, g_record_info);
 
     return SUCCESS;
@@ -429,16 +440,11 @@ bool SoundTest::startPlayback()
     }
     pthread_t pid_t;
 
-    if (openSoundCard(g_playback_info) != SUCCESS) {
-        mlog("openSoundCardit fail");
-        return FAIL;
-    }
-
-    mlog("sound test playback start");
     pthread_mutex_lock(&gMutex);
     gStatus = SOUND_PLAYBACK_START;
     pthread_mutex_unlock(&gMutex);
 
+    mlog("sound test playback start");
     pthread_create(&pid_t, NULL, playbackLoop, g_playback_info);
 
     return SUCCESS;
