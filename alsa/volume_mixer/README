@@ -1,0 +1,10 @@
+
+this program is use to adjust the alsa_mixer volume.
+=========================================================
+Usage:
+up:./volume -c <cardId> -m <mixerName> up ;  exp: ./volume -c 0 -m Master up
+
+down:./volume -c <cardId> -m <mixerName> down; exp: ./volume -c 0 -m Master down
+
+Build:
+just make in the current directory.
