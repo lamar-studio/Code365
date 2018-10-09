@@ -18,29 +18,26 @@
   along with pavucontrol. If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef sourcewidget_h
-#define sourcewidget_h
+#ifndef sink_h
+#define sink_h
 
-#include "pavucontrol.h"
+#include "audiomanager.h"
+#include "device.h"
 
-#include "devicewidget.h"
-
-class SourceWidget : public DeviceWidget {
+class Sink : public Device {
 public:
-    SourceWidget();
+    Sink();
 
-    SourceType type;
+    SinkType type;
     bool can_decibel;
 
-    virtual void executeVolumeUpdate();
+    virtual void updateVolume(pa_volume_t v);
 
-    virtual void autoDefault();
-    //virtual void manualDefault();
+    virtual void autoDefault(AudioCore *ac);
     virtual void updateDefault(const char *name);
-    virtual void setVolume(pa_volume_t v);
 
 protected:
-    //virtual void onPortChange();
+
 };
 
 #endif

@@ -18,37 +18,27 @@
   along with pavucontrol. If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef devicewidget_h
-#define devicewidget_h
+#ifndef sourceoutput_h
+#define sourceoutput_h
 
-#include "pavucontrol.h"
+#include "audiomanager.h"
 
-class MainWindow;
+class AudioCore;
 
-class DeviceWidget {
+class SourceOutput {
 public:
-    DeviceWidget();
-    virtual void updateChannelVolume(int channel, pa_volume_t v, bool isAll);
+    SourceOutput();
+    ~SourceOutput(void);
+
+    SourceOutputType type;
 
     std::string name;
-    std::string description;
-    std::string prio_type;
-    std::string activePort;
-    std::vector< std::pair<std::string,std::string> > ports;
-    uint32_t index, card_index;
-    uint32_t usb_cnt, hdmi_cnt, analog_cnt;
-
-    pa_cvolume volume;
-
-    virtual void executeVolumeUpdate();
-
-
-    void prepareMenu();
-
-protected:
+    uint32_t index, clientIndex;
+    uint32_t sourceIndex();
+    virtual void moveSourceOutput(const char *defName);
 
 private:
-
+    uint32_t mSourceIndex;
 };
 
 #endif

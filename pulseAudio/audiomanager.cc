@@ -22,17 +22,19 @@
 #include <config.h>
 #endif
 
+#include <unistd.h>
+#include <thread>
 #include <pulse/pulseaudio.h>
 #include <pulse/ext-stream-restore.h>
 #include <pulse/ext-device-manager.h>
 
-#include "pavucontrol.h"
-#include "cardwidget.h"
-#include "sinkwidget.h"
-#include "sourcewidget.h"
-#include "sinkinputwidget.h"
-#include "sourceoutputwidget.h"
-#include "mainwindow.h"
+#include "audiomanager.h"
+#include "card.h"
+#include "sink.h"
+#include "source.h"
+#include "sinkinput.h"
+#include "sourceoutput.h"
+#include "audiocore.h"
 
 static pa_context* context = NULL;
 static pa_mainloop_api* api = NULL;
@@ -40,7 +42,8 @@ static int n_outstanding = 0;
 static int default_tab = 0;
 static bool retry = false;
 static int reconnect_timeout = 1;
-
+static bool reconnect_running = false;
+static bool connected = false;
 
 #define DEBUG     (1)
 #define log(format, args...)  printf(format"\n", ##args)
@@ -50,7 +53,7 @@ static int reconnect_timeout = 1;
         } while(0)
 
 void card_cb(pa_context *, const pa_card_info *i, int eol, void *userdata) {
-    MainWindow *w = static_cast<MainWindow*>(userdata);
+    AudioCore *w = static_cast<AudioCore*>(userdata);
     mlog("[linzr]enter:%s eol:%d", __FUNCTION__, eol);
     if (eol < 0) {
         if (pa_context_errno(context) == PA_ERR_NOENTITY)
@@ -68,7 +71,7 @@ void card_cb(pa_context *, const pa_card_info *i, int eol, void *userdata) {
 }
 
 void sink_cb(pa_context *c, const pa_sink_info *i, int eol, void *userdata) {
-    MainWindow *w = static_cast<MainWindow*>(userdata);
+    AudioCore *w = static_cast<AudioCore*>(userdata);
     mlog("[linzr]enter:%s eol:%d", __FUNCTION__, eol);
     if (eol < 0) {
         if (pa_context_errno(context) == PA_ERR_NOENTITY)
@@ -86,7 +89,7 @@ void sink_cb(pa_context *c, const pa_sink_info *i, int eol, void *userdata) {
 }
 
 void source_cb(pa_context *, const pa_source_info *i, int eol, void *userdata) {
-    MainWindow *w = static_cast<MainWindow*>(userdata);
+    AudioCore *w = static_cast<AudioCore*>(userdata);
     mlog("[linzr]enter:%s eol:%d", __FUNCTION__, eol);
     if (eol < 0) {
         if (pa_context_errno(context) == PA_ERR_NOENTITY)
@@ -100,14 +103,17 @@ void source_cb(pa_context *, const pa_source_info *i, int eol, void *userdata) {
         return;
     }
 
-    if (strstr(i->name, "monitor") != NULL)
+    //if (strstr(i->name, "monitor") != NULL)
+    //    return;
+
+    if (i->monitor_of_sink != PA_INVALID_INDEX)
         return;
 
     w->updateSource(*i);
 }
 
 void sink_input_cb(pa_context *, const pa_sink_input_info *i, int eol, void *userdata) {
-    MainWindow *w = static_cast<MainWindow*>(userdata);
+    AudioCore *w = static_cast<AudioCore*>(userdata);
     mlog("[linzr]enter:%s eol:%d", __FUNCTION__, eol);
     if (eol < 0) {
         if (pa_context_errno(context) == PA_ERR_NOENTITY)
@@ -125,7 +131,7 @@ void sink_input_cb(pa_context *, const pa_sink_input_info *i, int eol, void *use
 }
 
 void source_output_cb(pa_context *, const pa_source_output_info *i, int eol, void *userdata) {
-    MainWindow *w = static_cast<MainWindow*>(userdata);
+    AudioCore *w = static_cast<AudioCore*>(userdata);
     mlog("[linzr]enter:%s eol:%d", __FUNCTION__, eol);
     if (eol < 0) {
         if (pa_context_errno(context) == PA_ERR_NOENTITY)
@@ -136,7 +142,7 @@ void source_output_cb(pa_context *, const pa_source_output_info *i, int eol, voi
     }
 
     if (eol > 0) {
-        w->printAllWidgets();
+        w->printAll();
         return;
     }
 
@@ -144,7 +150,7 @@ void source_output_cb(pa_context *, const pa_source_output_info *i, int eol, voi
 }
 
 void server_info_cb(pa_context *, const pa_server_info *i, void *userdata) {
-    MainWindow *w = static_cast<MainWindow*>(userdata);
+    AudioCore *w = static_cast<AudioCore*>(userdata);
     mlog("[linzr]enter:%s name:%s", __FUNCTION__, i->server_name);
     if (!i) {
         log("Server info callback failure");
@@ -155,7 +161,7 @@ void server_info_cb(pa_context *, const pa_server_info *i, void *userdata) {
 }
 
 void subscribe_cb(pa_context *c, pa_subscription_event_type_t t, uint32_t index, void *userdata) {
-    MainWindow *w = static_cast<MainWindow*>(userdata);
+    AudioCore *w = static_cast<AudioCore*>(userdata);
     mlog("[linzr]enter:%s case:%#x", __FUNCTION__, t & PA_SUBSCRIPTION_EVENT_FACILITY_MASK);
     switch (t & PA_SUBSCRIPTION_EVENT_FACILITY_MASK) {
         case PA_SUBSCRIPTION_EVENT_SINK: // 0x0000U
@@ -239,11 +245,39 @@ void subscribe_cb(pa_context *c, pa_subscription_event_type_t t, uint32_t index,
 /* Forward Declaration */
 bool connect_to_pulse(void *userdata);
 
+void do_reconnect(void *userdata)
+{
+    AudioCore *w = static_cast<AudioCore*>(userdata);
+    if (reconnect_running || connected) {
+        return;
+    }
+
+    reconnect_running = true;
+
+    while (!connected) {
+        connect_to_pulse(w);
+        usleep(500000);
+    }
+
+    reconnect_running = false;
+}
+
+
+void reconnect(void *userdata)
+{
+
+    if (!reconnect_running && !connected) {
+        std::thread rThread(do_reconnect, userdata);
+        rThread.detach();
+    }
+}
+
+
 void context_state_callback(pa_context *c, void *userdata) {
-    MainWindow *w = static_cast<MainWindow*>(userdata);
+    AudioCore *w = static_cast<AudioCore*>(userdata);
 
     //g_assert(c);
-
+    mlog("enter:%s state:%d", __FUNCTION__, pa_context_get_state(c));
     switch (pa_context_get_state(c)) {
         case PA_CONTEXT_UNCONNECTED:
         case PA_CONTEXT_CONNECTING:
@@ -255,6 +289,7 @@ void context_state_callback(pa_context *c, void *userdata) {
             pa_operation *o;
 
             reconnect_timeout = 1;
+            connected = true;
 
             pa_context_set_subscribe_callback(c, subscribe_cb, w);
 
@@ -318,16 +353,16 @@ void context_state_callback(pa_context *c, void *userdata) {
             break;
         }
 
-        case PA_CONTEXT_FAILED:
-            w->removeAllWidgets();
+        case PA_CONTEXT_FAILED: {
+            connected = false;
+            w->removeAll();
             pa_context_unref(context);
             context = NULL;
 
-            if (reconnect_timeout > 0) {
-                log("Connection failed, attempting reconnect");
-                //g_timeout_add_seconds(reconnect_timeout, connect_to_pulse, w);
-            }
+            connect_to_pulse(w);
+
             return;
+        }
 
         case PA_CONTEXT_TERMINATED:
         default:
@@ -340,11 +375,11 @@ pa_context* get_context(void) {
 }
 
 bool connect_to_pulse(void *userdata) {
-    MainWindow *w = static_cast<MainWindow*>(userdata);
+    AudioCore *w = static_cast<AudioCore*>(userdata);
 
     if (context)
         return false;
-
+    mlog("enter:%s", __FUNCTION__);
     pa_proplist *proplist = pa_proplist_new();
     pa_proplist_sets(proplist, PA_PROP_APPLICATION_NAME, "PulseAudio Volume Control");
     pa_proplist_sets(proplist, PA_PROP_APPLICATION_ID, "org.PulseAudio.pavucontrol");
@@ -360,14 +395,7 @@ bool connect_to_pulse(void *userdata) {
     //w->setConnectingMessage();
     if (pa_context_connect(context, NULL, PA_CONTEXT_NOFAIL, NULL) < 0) {
         if (pa_context_errno(context) == PA_ERR_INVALID) {
-            #if 0
-            w->setConnectingMessage(_("Connection to PulseAudio failed. Automatic retry in 5s\n\n"
-                "In this case this is likely because PULSE_SERVER in the Environment/X11 Root Window Properties\n"
-                "or default-server in client.conf is misconfigured.\n"
-                "This situation can also arrise when PulseAudio crashed and left stale details in the X11 Root Window.\n"
-                "If this is the case, then PulseAudio should autospawn again, or if this is not configured you should\n"
-                "run start-pulseaudio-x11 manually."));
-            #endif
+            log("Connection to PulseAudio failed. Automatic retry in 5s");
             reconnect_timeout = 5;
         }
         else {
@@ -376,7 +404,8 @@ bool connect_to_pulse(void *userdata) {
             } else {
                 log("Connection failed, attempting reconnect");
                 reconnect_timeout = 5;
-                //g_timeout_add_seconds(reconnect_timeout, connect_to_pulse, w);
+                sleep(reconnect_timeout);
+                connect_to_pulse(w);
             }
         }
     }
@@ -389,14 +418,14 @@ int main(int argc, char *argv[]) {
 
     signal(SIGPIPE, SIG_IGN);
 
-    MainWindow *mainWindow = new MainWindow();
+    AudioCore *ac = new AudioCore();
 
     pa_mainloop *m = pa_mainloop_new();
     //g_assert(m);
     api = pa_mainloop_get_api(m);
     //g_assert(api);
 
-    connect_to_pulse(mainWindow);
+    connect_to_pulse(ac);
     int ret;
     if (reconnect_timeout >= 0)
         pa_mainloop_run(m, &ret);
@@ -404,7 +433,7 @@ int main(int argc, char *argv[]) {
     if (reconnect_timeout < 0)
         log("Fatal Error: Unable to connect to PulseAudio");
 
-    delete mainWindow;
+    delete ac;
 
     if (context)
         pa_context_unref(context);
@@ -412,3 +441,46 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+
+
+int AudioManager::startPaService() {
+    //1. modprobe module
+    //2. systemctl start service
+}
+
+int AudioManager::stopPaService() {
+    //1. systemctl stop service
+    //2. modprobe -r module
+}
+
+int AudioManager::connectPaService() {
+
+    AudioCore *ac = new AudioCore();
+
+    pa_mainloop *m = pa_mainloop_new();
+    //g_assert(m);
+    api = pa_mainloop_get_api(m);
+    //g_assert(api);
+
+    connect_to_pulse(ac);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

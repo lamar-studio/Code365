@@ -22,34 +22,27 @@
 #include <config.h>
 #endif
 
-#include "sinkwidget.h"
+#include "source.h"
 
-#if HAVE_EXT_DEVICE_RESTORE_API
-#  include <pulse/format.h>
-#  include <pulse/ext-device-restore.h>
-#endif
-
-SinkWidget::SinkWidget() {
+Source::Source() {
 
 }
 
+void Source::updateVolume(pa_volume_t v) {
 
-void SinkWidget::setVolume(pa_volume_t v) {
-    //updateChannelVolume(0, v, true);
-}
+    updateChannelVolume(0, v, true);
 
-void SinkWidget::executeVolumeUpdate() {
     pa_operation* o;
 
-    if (!(o = pa_context_set_sink_volume_by_index(get_context(), index, &volume, NULL, NULL))) {
-        log("pa_context_set_sink_volume_by_index() failed");
+    if (!(o = pa_context_set_source_volume_by_index(get_context(), index, &volume, NULL, NULL))) {
+        log("pa_context_set_source_volume_by_index() failed");
         return;
     }
 
     pa_operation_unref(o);
 }
 
-void SinkWidget::autoDefault() {
+void Source::autoDefault(AudioCore *ac) {
 
     std::string usb_name;
     std::string hdmi_name;
@@ -57,9 +50,9 @@ void SinkWidget::autoDefault() {
     std::string def_name;
 
     uint32_t idx = 0;
-#if 0
-    for (std::map<uint32_t, SinkWidget*>::iterator i = sinkWidgets.begin(); i != sinkWidgets.end(); ++i) {
-        SinkWidget *w = i->second;
+
+    for (std::map<uint32_t, Source*>::iterator i = ac->sources.begin(); i != ac->sources.end(); ++i) {
+        Source *w = i->second;
         if (!w)
             continue;
 
@@ -80,33 +73,18 @@ void SinkWidget::autoDefault() {
     if (def_name.empty()) {
         def_name = hdmi_name.empty() ? ana_name : hdmi_name;
     }
-
-    updateDefault(def_name.c_str());
-#endif
-
+    mlog("[linzr]exit:%s def_name:%s", __FUNCTION__, def_name.c_str());
+    if (ac->defaultSinkName != def_name)
+        updateDefault(def_name.c_str());
 }
 
-
-void SinkWidget::manualDefault() {
-
-    const char *usb_name = NULL;
-    const char *hdmi_name = NULL;
-    const char *ana_name = NULL;
-    const char *def_name = NULL;
-    uint32_t idx = 0;
-
-    //updateDefault(name);
-
-}
-
-void SinkWidget::updateDefault(const char *name) {
+void Source::updateDefault(const char *name) {
     pa_operation* o;
 
-    if (!(o = pa_context_set_default_sink(get_context(), name, NULL, NULL))) {
-        log("pa_context_set_default_sink() failed");
+    if (!(o = pa_context_set_default_source(get_context(), name, NULL, NULL))) {
+        log("pa_context_set_default_source() failed");
         return;
     }
     pa_operation_unref(o);
 }
-
 

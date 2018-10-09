@@ -18,22 +18,22 @@
   along with pavucontrol. If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef sinkinputwidget_h
-#define sinkinputwidget_h
+#ifndef sinkinput_h
+#define sinkinput_h
 
-#include "pavucontrol.h"
+#include "audiomanager.h"
 
-class SinkInputWidget {
+class SinkInput {
 public:
-    SinkInputWidget();
-    ~SinkInputWidget(void);
+    SinkInput();
+    ~SinkInput(void);
 
     SinkInputType type;
 
     std::string name;
     uint32_t index, clientIndex;
     uint32_t sinkIndex();
-    virtual void moveSinkInput(const char *defIndex);
+    virtual void moveSinkInput(const char *defName);
 
 private:
     uint32_t mSinkIndex;

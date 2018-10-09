@@ -18,30 +18,38 @@
   along with pavucontrol. If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef sinkwidget_h
-#define sinkwidget_h
+#ifndef device_h
+#define device_h
 
-#include "pavucontrol.h"
-#include "devicewidget.h"
+#include "audiomanager.h"
+#include "audiocore.h"
 
-class MainWindow;
+class AudioCore;
 
-class SinkWidget : public DeviceWidget {
+class Device {
 public:
-    SinkWidget();
+    Device();
+    virtual void updateChannelVolume(int channel, pa_volume_t v, bool isAll);
 
-    SinkType type;
-    bool can_decibel;
+    std::string name;
+    std::string description;
+    std::string prio_type;
+    std::string activePort;
+    std::vector< std::pair<std::string,std::string> > ports;
+    uint32_t index, card_index;
+    uint32_t usb_cnt, hdmi_cnt, analog_cnt;
+
+    pa_cvolume volume;
 
     virtual void executeVolumeUpdate();
 
-    virtual void autoDefault();
-    virtual void manualDefault();
-    virtual void updateDefault(const char *name);
 
-    virtual void setVolume(pa_volume_t v);
+    void prepareMenu();
 
 protected:
+    AudioCore *mpAC;
+
+private:
 
 };
 

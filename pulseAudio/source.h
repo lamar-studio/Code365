@@ -18,40 +18,27 @@
   along with pavucontrol. If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef cardwidget_h
-#define cardwidget_h
+#ifndef source_h
+#define source_h
 
-#include "pavucontrol.h"
+#include "audiomanager.h"
 
-class PortInfo {
+#include "device.h"
+
+class Source : public Device {
 public:
-      std::string name;
-      std::string description;
-      uint32_t priority;
-      int available;
-      int direction;
-      std::vector<std::string> profiles;
-};
+    Source();
 
-class CardWidget {
-public:
-    CardWidget();
+    SourceType type;
+    bool can_decibel;
 
-    std::string name;
-    uint32_t index;
-    bool updating;
+    virtual void updateVolume(pa_volume_t v);
 
-    std::vector< std::pair<std::string,std::string> > profiles;
-    std::map<std::string, PortInfo> ports;
-    std::string activeProfile;
-    bool hasSinks;
-    bool hasSources;
-
-    void prepareMenu();
+    virtual void autoDefault(AudioCore *ac);
+    virtual void updateDefault(const char *name);
 
 protected:
-  virtual void onProfileChange(uint32_t index, const char *profile);
-
+    //virtual void onPortChange();
 };
 
 #endif

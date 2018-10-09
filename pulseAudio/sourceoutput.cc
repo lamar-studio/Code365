@@ -18,27 +18,36 @@
   along with pavucontrol. If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef sourceoutputwidget_h
-#define sourceoutputwidget_h
-
-#include "pavucontrol.h"
-
-class MainWindow;
-
-class SourceOutputWidget {
-public:
-    SourceOutputWidget();
-    ~SourceOutputWidget(void);
-
-    SourceOutputType type;
-
-    std::string name;
-    uint32_t index, clientIndex;
-    uint32_t sourceIndex();
-    virtual void moveSourceOutput(uint32_t defIndex);
-
-private:
-    uint32_t mSourceIndex;
-};
-
+#ifdef HAVE_CONFIG_H
+#include <config.h>
 #endif
+
+#include "sourceoutput.h"
+#include "audiocore.h"
+#include "source.h"
+
+SourceOutput::SourceOutput() {
+
+}
+
+
+SourceOutput::~SourceOutput(void) {
+
+}
+
+
+uint32_t SourceOutput::sourceIndex() {
+    return mSourceIndex;
+}
+
+void SourceOutput::moveSourceOutput(const char *defName) {
+
+  pa_operation* o;
+  if (!(o = pa_context_move_source_output_by_name(get_context(), index, defName, NULL, NULL))) {
+    log("pa_context_move_source_output_by_index() failed");
+    return;
+  }
+
+  pa_operation_unref(o);
+}
+

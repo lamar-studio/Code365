@@ -24,13 +24,13 @@
 
 #include <set>
 
-#include "mainwindow.h"
+#include "audiocore.h"
 
-#include "cardwidget.h"
-#include "sinkwidget.h"
-#include "sourcewidget.h"
-#include "sinkinputwidget.h"
-#include "sourceoutputwidget.h"
+#include "card.h"
+#include "sink.h"
+#include "source.h"
+#include "sinkinput.h"
+#include "sourceoutput.h"
 
 /* Used for profile sorting */
 struct profile_prio_compare {
@@ -63,7 +63,7 @@ struct source_port_prio_compare {
     }
 };
 
-MainWindow::MainWindow() :
+AudioCore::AudioCore() :
     showSinkInputType(SINK_INPUT_CLIENT),
     showSinkType(SINK_ALL),
     showSourceOutputType(SOURCE_OUTPUT_CLIENT),
@@ -71,11 +71,11 @@ MainWindow::MainWindow() :
 
 }
 
-MainWindow::~MainWindow() {
+AudioCore::~AudioCore() {
 
 }
 
-static void updatePorts(DeviceWidget *w, std::map<std::string, PortInfo> &ports) {
+static void updatePorts(Device *w, std::map<std::string, PortInfo> &ports) {
     std::map<std::string, PortInfo>::iterator it;
     PortInfo p;
     mlog("[linzr]enter:%s", __FUNCTION__);
@@ -106,15 +106,41 @@ static void updatePorts(DeviceWidget *w, std::map<std::string, PortInfo> &ports)
 
 }
 
-void MainWindow::updateCard(const pa_card_info &info) {
-    CardWidget *w;
+uint32_t AudioCore::sinkNameToIndex(std::string name) {
+
+    Sink *sink;
+
+    for (std::map<uint32_t, Sink*>::iterator it = sinks.begin(); it != sinks.end(); ++it) {
+        Sink *sink = it->second;
+
+        if (sink->name == name) {
+            return sink->index;
+        }
+    }
+}
+
+uint32_t AudioCore::sourceNameToIndex(std::string name) {
+
+    Source *source;
+
+    for (std::map<uint32_t, Source*>::iterator it = sources.begin(); it != sources.end(); ++it) {
+        Source *source = it->second;
+
+        if (source->name == name) {
+            return source->index;
+        }
+    }
+}
+
+void AudioCore::updateCard(const pa_card_info &info) {
+    Card *w;
     bool is_new = false;
     std::set<pa_card_profile_info, profile_prio_compare> profile_priorities;
     mlog("[linzr]enter:%s name:%s", __FUNCTION__, info.name);
-    if (cardWidgets.count(info.index))
-        w = cardWidgets[info.index];
+    if (cards.count(info.index))
+        w = cards[info.index];
     else {
-        cardWidgets[info.index] = w = new CardWidget();
+        cards[info.index] = w = new Card();
         w->index = info.index;
         is_new = true;
     }
@@ -175,10 +201,10 @@ void MainWindow::updateCard(const pa_card_info &info) {
     /* Because the port info for sinks and sources is discontinued we need
      * to update the port info for them here. */
     if (w->hasSinks) {
-        std::map<uint32_t, SinkWidget*>::iterator it;
+        std::map<uint32_t, Sink*>::iterator it;
 
-        for (it = sinkWidgets.begin() ; it != sinkWidgets.end(); it++) {
-            SinkWidget *sw = it->second;
+        for (it = sinks.begin() ; it != sinks.end(); it++) {
+            Sink *sw = it->second;
 
             if (sw->card_index == w->index) {
                 updatePorts(sw, w->ports);
@@ -187,10 +213,10 @@ void MainWindow::updateCard(const pa_card_info &info) {
     }
 
     if (w->hasSources) {
-        std::map<uint32_t, SourceWidget*>::iterator it;
+        std::map<uint32_t, Source*>::iterator it;
 
-        for (it = sourceWidgets.begin() ; it != sourceWidgets.end(); it++) {
-            SourceWidget *sw = it->second;
+        for (it = sources.begin() ; it != sources.end(); it++) {
+            Source *sw = it->second;
 
             if (sw->card_index == w->index) {
                 updatePorts(sw, w->ports);
@@ -200,24 +226,22 @@ void MainWindow::updateCard(const pa_card_info &info) {
 
     w->prepareMenu();
 
-    // if (is_new)
-        // updateDeviceVisibility(); //可以换做其他的逻辑判断
     mlog("[linzr]exit:%s", __FUNCTION__);
 }
 
-bool MainWindow::updateSink(const pa_sink_info &info) {
-    SinkWidget *w;
+bool AudioCore::updateSink(const pa_sink_info &info) {
+    Sink *w;
     const char *t;
     bool is_new = false;
-    std::map<uint32_t, CardWidget*>::iterator cw;
+    std::map<uint32_t, Card*>::iterator cw;
     std::set<pa_sink_port_info,sink_port_prio_compare> port_priorities;
-    mlog("[linzr]enter:%s name:%s", __FUNCTION__, info.name);
-    if (sinkWidgets.count(info.index))
-        w = sinkWidgets[info.index];
+    mlog("[linzr]enter:%s name:%s desc:%s", __FUNCTION__, info.name, info.description);
+    if (sinks.count(info.index))
+        w = sinks[info.index];
     else {
         is_new = true;
 
-        sinkWidgets[info.index] = w = new SinkWidget();
+        sinks[info.index] = w = new Sink();
         w->index = info.index;
         w->prio_type = pa_proplist_gets(info.proplist, "alsa.name");
     }
@@ -227,8 +251,6 @@ bool MainWindow::updateSink(const pa_sink_info &info) {
     w->description = info.description;
     w->type = info.flags & PA_SINK_HARDWARE ? SINK_HARDWARE : SINK_VIRTUAL;
 
-    if (!mManual)
-        w->autoDefault();
 
     port_priorities.clear();
     for (uint32_t i=0; i<info.n_ports; ++i) {
@@ -241,8 +263,10 @@ bool MainWindow::updateSink(const pa_sink_info &info) {
 
     w->activePort = info.active_port ? info.active_port->name : "";
 
-    cw = cardWidgets.find(info.card);
-    if (cw != cardWidgets.end())
+    w->autoDefault(this);
+
+    cw = cards.find(info.card);
+    if (cw != cards.end())
         updatePorts(w, cw->second->ports);
 
     w->prepareMenu();
@@ -250,17 +274,17 @@ bool MainWindow::updateSink(const pa_sink_info &info) {
     return is_new;
 }
 
-void MainWindow::updateSource(const pa_source_info &info) {
-    SourceWidget *w;
+void AudioCore::updateSource(const pa_source_info &info) {
+    Source *w;
     bool is_new = false;
-    std::map<uint32_t, CardWidget*>::iterator cw;
+    std::map<uint32_t, Card*>::iterator cw;
     std::set<pa_source_port_info,source_port_prio_compare> port_priorities;
-    mlog("[linzr]enter:%s name:%s", __FUNCTION__, info.name);
+    mlog("[linzr]enter:%s name:%s desc:%s", __FUNCTION__, info.name, info.description);
 
-    if (sourceWidgets.count(info.index))
-        w = sourceWidgets[info.index];
+    if (sources.count(info.index))
+        w = sources[info.index];
     else {
-        sourceWidgets[info.index] = w = new SourceWidget();
+        sources[info.index] = w = new Source();
 
         w->index = info.index;
         w->prio_type = pa_proplist_gets(info.proplist, "alsa.name");
@@ -273,7 +297,7 @@ void MainWindow::updateSource(const pa_source_info &info) {
     w->type = info.monitor_of_sink != PA_INVALID_INDEX ? SOURCE_MONITOR : (info.flags & PA_SOURCE_HARDWARE ? SOURCE_HARDWARE : SOURCE_VIRTUAL);
 
     if (!mManual)
-        w->autoDefault();
+        //w->autoDefault(this);
 
     port_priorities.clear();
     for (uint32_t i=0; i<info.n_ports; ++i) {
@@ -286,9 +310,10 @@ void MainWindow::updateSource(const pa_source_info &info) {
 
     w->activePort = info.active_port ? info.active_port->name : "";
 
-    cw = cardWidgets.find(info.card);
+    w->autoDefault(this);
+    cw = cards.find(info.card);
 
-    if (cw != cardWidgets.end())
+    if (cw != cards.end())
         updatePorts(w, cw->second->ports);
 
     w->prepareMenu();
@@ -296,9 +321,9 @@ void MainWindow::updateSource(const pa_source_info &info) {
     return;
 }
 
-void MainWindow::updateSinkInput(const pa_sink_input_info &info) {
+void AudioCore::updateSinkInput(const pa_sink_input_info &info) {
     const char *t;
-    SinkInputWidget *w;
+    SinkInput *w;
     bool is_new = false;
     mlog("[linzr]enter:%s name:%s", __FUNCTION__, info.name);
     if ((t = pa_proplist_gets(info.proplist, "module-stream-restore.id"))) {
@@ -308,10 +333,10 @@ void MainWindow::updateSinkInput(const pa_sink_input_info &info) {
         }
     }
 
-    if (sinkInputWidgets.count(info.index)) {
-        w = sinkInputWidgets[info.index];
+    if (sinkInputs.count(info.index)) {
+        w = sinkInputs[info.index];
     } else {
-        sinkInputWidgets[info.index] = w = new SinkInputWidget();
+        sinkInputs[info.index] = w = new SinkInput();
         w->index = info.index;
         w->clientIndex = info.client;
         w->name = info.name;
@@ -323,8 +348,8 @@ void MainWindow::updateSinkInput(const pa_sink_input_info &info) {
     return;
 }
 
-void MainWindow::updateSourceOutput(const pa_source_output_info &info) {
-    SourceOutputWidget *w;
+void AudioCore::updateSourceOutput(const pa_source_output_info &info) {
+    SourceOutput *w;
     const char *app;
     bool is_new = false;
     mlog("[linzr]enter:%s name:%s", __FUNCTION__, info.name);
@@ -334,10 +359,10 @@ void MainWindow::updateSourceOutput(const pa_source_output_info &info) {
             || strcmp(app, "org.kde.kmixd") == 0)
             return;
 
-    if (sourceOutputWidgets.count(info.index))
-        w = sourceOutputWidgets[info.index];
+    if (sourceOutputs.count(info.index))
+        w = sourceOutputs[info.index];
     else {
-        sourceOutputWidgets[info.index] = w = new SourceOutputWidget();
+        sourceOutputs[info.index] = w = new SourceOutput();
 
         w->index = info.index;
         w->clientIndex = info.client;
@@ -346,99 +371,104 @@ void MainWindow::updateSourceOutput(const pa_source_output_info &info) {
     }
 
     w->type = info.client != PA_INVALID_INDEX ? SOURCE_OUTPUT_CLIENT : SOURCE_OUTPUT_VIRTUAL;
-    w->moveSourceOutput(defaultSourceIdx);
 
     return;
 }
 
-void MainWindow::updateServer(const pa_server_info &info) {
+void AudioCore::updateServer(const pa_server_info &info) {
 
     defaultSourceName = info.default_source_name ? info.default_source_name : "";
     defaultSinkName = info.default_sink_name ? info.default_sink_name : "";
 
-    for (std::map<uint32_t, SinkInputWidget*>::iterator it = sinkInputWidgets.begin(); it != sinkInputWidgets.end(); ++it)
+    //move sinkInput to default
+    for (std::map<uint32_t, SinkInput*>::iterator it = sinkInputs.begin(); it != sinkInputs.end(); ++it)
         it->second->moveSinkInput(defaultSinkName.c_str());
-    mlog("[linzr]enter:%s defSink:%s defSource:%s", __FUNCTION__, defaultSourceName.c_str(), defaultSinkName.c_str());
+
+    //move sourceOutput to default
+    for (std::map<uint32_t, SourceOutput*>::iterator it = sourceOutputs.begin(); it != sourceOutputs.end(); ++it)
+        it->second->moveSourceOutput(defaultSourceName.c_str());
+
+    mlog("[linzr]enter:%s defSource:%s defSink:%s", __FUNCTION__, defaultSourceName.c_str(), defaultSinkName.c_str());
 }
 
-void MainWindow::removeCard(uint32_t index) {
+void AudioCore::removeCard(uint32_t index) {
     mlog("[linzr]enter:%s index:%d", __FUNCTION__, index);
-    if (!cardWidgets.count(index))
+    if (!cards.count(index))
         return;
 
-    delete cardWidgets[index];
-    cardWidgets.erase(index);
+    delete cards[index];
+    cards.erase(index);
 }
 
-void MainWindow::removeSink(uint32_t index) {
+void AudioCore::removeSink(uint32_t index) {
     mlog("[linzr]enter:%s index:%d", __FUNCTION__, index);
-    if (!sinkWidgets.count(index))
+    if (!sinks.count(index))
         return;
 
-    delete sinkWidgets[index];
-    sinkWidgets.erase(index);
+    delete sinks[index];
+    sinks.erase(index);
 }
 
-void MainWindow::removeSource(uint32_t index) {
+void AudioCore::removeSource(uint32_t index) {
     mlog("[linzr]enter:%s index:%d", __FUNCTION__, index);
-    if (!sourceWidgets.count(index))
+    if (!sources.count(index))
         return;
 
-    delete sourceWidgets[index];
-    sourceWidgets.erase(index);
+    delete sources[index];
+    sources.erase(index);
 }
 
-void MainWindow::removeSinkInput(uint32_t index) {
+void AudioCore::removeSinkInput(uint32_t index) {
     mlog("[linzr]enter:%s index:%d", __FUNCTION__, index);
-    if (!sinkInputWidgets.count(index))
+    if (!sinkInputs.count(index))
         return;
 
-    delete sinkInputWidgets[index];
-    sinkInputWidgets.erase(index);
+    delete sinkInputs[index];
+    sinkInputs.erase(index);
 }
 
-void MainWindow::removeSourceOutput(uint32_t index) {
+void AudioCore::removeSourceOutput(uint32_t index) {
     mlog("[linzr]enter:%s index:%d", __FUNCTION__, index);
-    if (!sourceOutputWidgets.count(index))
+    if (!sourceOutputs.count(index))
         return;
 
-    delete sourceOutputWidgets[index];
-    sourceOutputWidgets.erase(index);
+    delete sourceOutputs[index];
+    sourceOutputs.erase(index);
 }
 
-void MainWindow::removeAllWidgets() {
+void AudioCore::removeAll() {
     mlog("[linzr]enter:%s", __FUNCTION__);
-    for (std::map<uint32_t, SinkInputWidget*>::iterator it = sinkInputWidgets.begin(); it != sinkInputWidgets.end(); ++it)
+    for (std::map<uint32_t, SinkInput*>::iterator it = sinkInputs.begin(); it != sinkInputs.end(); ++it)
         removeSinkInput(it->first);
-    for (std::map<uint32_t, SourceOutputWidget*>::iterator it = sourceOutputWidgets.begin(); it != sourceOutputWidgets.end(); ++it)
+    for (std::map<uint32_t, SourceOutput*>::iterator it = sourceOutputs.begin(); it != sourceOutputs.end(); ++it)
         removeSourceOutput(it->first);
-    for (std::map<uint32_t, SinkWidget*>::iterator it = sinkWidgets.begin(); it != sinkWidgets.end(); ++it)
+    for (std::map<uint32_t, Sink*>::iterator it = sinks.begin(); it != sinks.end(); ++it)
         removeSink(it->first);
-    for (std::map<uint32_t, SourceWidget*>::iterator it = sourceWidgets.begin(); it != sourceWidgets.end(); ++it)
+    for (std::map<uint32_t, Source*>::iterator it = sources.begin(); it != sources.end(); ++it)
         removeSource(it->first);
-    for (std::map<uint32_t, CardWidget*>::iterator it = cardWidgets.begin(); it != cardWidgets.end(); ++it)
+    for (std::map<uint32_t, Card*>::iterator it = cards.begin(); it != cards.end(); ++it)
        removeCard(it->first);
 }
 
-void MainWindow::printAllWidgets() {
+void AudioCore::printAll() {
     mlog("[linzr]enter:%s", __FUNCTION__);
-    for (std::map<uint32_t, SinkInputWidget*>::iterator it = sinkInputWidgets.begin(); it != sinkInputWidgets.end(); ++it)
+    for (std::map<uint32_t, SinkInput*>::iterator it = sinkInputs.begin(); it != sinkInputs.end(); ++it)
         mlog("sinkInput:%s (%d)", it->second->name.c_str(), it->second->index);
-    for (std::map<uint32_t, SourceOutputWidget*>::iterator it = sourceOutputWidgets.begin(); it != sourceOutputWidgets.end(); ++it)
+    for (std::map<uint32_t, SourceOutput*>::iterator it = sourceOutputs.begin(); it != sourceOutputs.end(); ++it)
         mlog("sourceOutput:%s (%d)", it->second->name.c_str(), it->second->index);
-    for (std::map<uint32_t, SinkWidget*>::iterator it = sinkWidgets.begin(); it != sinkWidgets.end(); ++it)
+    for (std::map<uint32_t, Sink*>::iterator it = sinks.begin(); it != sinks.end(); ++it)
         mlog("sink:%s (%d)", it->second->name.c_str(), it->second->index);
-    for (std::map<uint32_t, SourceWidget*>::iterator it = sourceWidgets.begin(); it != sourceWidgets.end(); ++it)
+    for (std::map<uint32_t, Source*>::iterator it = sources.begin(); it != sources.end(); ++it)
         mlog("source:%s (%d)", it->second->name.c_str(), it->second->index);
-    for (std::map<uint32_t, CardWidget*>::iterator it = cardWidgets.begin(); it != cardWidgets.end(); ++it)
+    for (std::map<uint32_t, Card*>::iterator it = cards.begin(); it != cards.end(); ++it)
         mlog("card:%s (%d)", it->second->name.c_str(), it->second->index);
 }
 
 //new interface
-int MainWindow::getDeviceList(char *list) {
+int AudioCore::getDeviceList(char *list) {
 
-    for (std::map<uint32_t, CardWidget*>::iterator it = cardWidgets.begin(); it != cardWidgets.end(); ++it) {
-        CardWidget *c = it->second;
+    for (std::map<uint32_t, Card*>::iterator it = cards.begin(); it != cards.end(); ++it) {
+        Card *c = it->second;
         log("CARD[%d]:", c->index);
         for (uint32_t i = 0; i < c->profiles.size(); ++i) {
             log("profile.name:%s profile.desc:%s", c->profiles[i].first.c_str(), c->profiles[i].second.c_str());
@@ -446,7 +476,7 @@ int MainWindow::getDeviceList(char *list) {
     }
 }
 
-void MainWindow::setSoundPath(uint32_t index, const char *profile) { //profile.second
+void AudioCore::setSoundPath(uint32_t index, const char *profile) { //profile.second
 
     mManual = true;
     pa_operation* o;
@@ -459,44 +489,46 @@ void MainWindow::setSoundPath(uint32_t index, const char *profile) { //profile.s
 
 }
 
-int MainWindow::setSoundVolume(uint32_t volume, int direction) { //only change the default
+int AudioCore::setSinkVolume(pa_volume_t vol) {
 
-    if (sinkWidgets.count(defaultSinkIdx)) {
-        SinkWidget *sink = sinkWidgets[defaultSinkIdx];
-        sink->setVolume(volume);
-    }
-
-    if (sourceWidgets.count(defaultSourceIdx)) {
-        SourceWidget *source = sourceWidgets[defaultSourceIdx];
-        source->setVolume(volume);
+    if (sinks.count(defaultSinkIdx)) {
+        Sink *sink = sinks[defaultSinkIdx];
+        sink->updateVolume(vol);
     }
 
     return 0;
 }
 
-void MainWindow::updateDefaultIdx() { //only change the default
 
-    SinkWidget *sink;
-    SourceWidget *source;
+int AudioCore::setSourceVolume(pa_volume_t vol) {
 
-    for (std::map<uint32_t, SinkWidget*>::iterator it = sinkWidgets.begin(); it != sinkWidgets.end(); ++it) {
-        SinkWidget *sink = it->second;
-
-        if (sink->name == defaultSinkName) {
-            defaultSinkIdx = sink->index;
-            break;
-        }
+    if (sources.count(defaultSourceIdx)) {
+        Source *source = sources[defaultSourceIdx];
+        source->updateVolume(vol);
     }
 
-    for (std::map<uint32_t, SourceWidget*>::iterator it = sourceWidgets.begin(); it != sourceWidgets.end(); ++it) {
-        SourceWidget *source = it->second;
+    return 0;
+}
 
-        if (source->name == defaultSourceName) {
-            defaultSourceIdx = source->index;
-            break;
-        }
+
+int AudioCore::setDefaultSink(uint32_t index) {
+
+    if (sinks.count(index)) {
+        Sink *sink = sinks[index];
+        sink->updateDefault(sink->name.c_str());
     }
 
+    return 0;
+}
+
+int AudioCore::setDefaultSource(uint32_t index) {
+
+    if (sources.count(index)) {
+        Source *source = sources[index];
+        source->updateDefault(source->name.c_str());
+    }
+
+    return 0;
 }
 
 

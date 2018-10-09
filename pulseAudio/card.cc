@@ -22,16 +22,17 @@
 #include <config.h>
 #endif
 
-#include "cardwidget.h"
+#include "card.h"
 
-/*** CardWidget ***/
-CardWidget::CardWidget() {
+/*** Card ***/
+Card::Card() {
 
 }
 
-void CardWidget::prepareMenu() {
+void Card::prepareMenu() {
 
     /* Fill the ComboBox's Tree Model */
+    log("activeProfile:[%s]", activeProfile.c_str());
     for (uint32_t i = 0; i < profiles.size(); ++i) {
         //log("profile.fist:%s profile.second:[%s]", profiles[i].first.c_str(), profiles[i].second.c_str());
         log("profiles:[%s]", profiles[i].second.c_str());
@@ -39,7 +40,7 @@ void CardWidget::prepareMenu() {
 
 }
 
-void CardWidget::onProfileChange(uint32_t index, const char *profile) { //profile.second
+void Card::onProfileChange(uint32_t index, const char *profile) { //profile.second
 
     if (updating)
         return;

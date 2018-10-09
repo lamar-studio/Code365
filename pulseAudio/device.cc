@@ -24,15 +24,15 @@
 
 #include <pulse/ext-device-manager.h>
 
-#include "mainwindow.h"
-#include "devicewidget.h"
+#include "audiocore.h"
+#include "device.h"
 
-/*** DeviceWidget ***/
-DeviceWidget::DeviceWidget() {
+/*** Device ***/
+Device::Device() {
 
 }
 
-void DeviceWidget::updateChannelVolume(int channel, pa_volume_t v, bool isAll) {
+void Device::updateChannelVolume(int channel, pa_volume_t v, bool isAll) {
     pa_cvolume n;
     //g_assert(channel < volume.channels);
 
@@ -41,50 +41,14 @@ void DeviceWidget::updateChannelVolume(int channel, pa_volume_t v, bool isAll) {
         pa_cvolume_set(&n, n.channels, v);
     else
         n.values[channel] = v;
-
-    executeVolumeUpdate();
 }
 
-#if 0
-void DeviceWidget::setDefault(bool isDefault) {
-
-#if 0
-    //根据优先级策略,选出idx
-    for (std::map<uint32_t, SinkWidget*>::iterator i = sinkWidgets.begin(); i != sinkWidgets.end(); ++i) {
-        SinkWidget *w = i->second;
-        fprintf(stderr, "enter:%s --linzaorong sinkName:%s\n", __FUNCTION__, i->second->description.c_str());
-        if (!w)
-            continue;
-
-        w->updating = true;
-        w->setDefault(w->name == defaultSinkName);  //更新图标
-
-        w->updating = false;
-    }
-
-    for (std::map<uint32_t, SourceWidget*>::iterator i = sourceWidgets.begin(); i != sourceWidgets.end(); ++i) {
-        SourceWidget *w = i->second;
-        fprintf(stderr, "enter:%s --linzaorong sourceName:%s\n", __FUNCTION__, i->second->description.c_str());
-
-        if (!w)
-            continue;
-        w->updating = true;
-        w->setDefault(w->name == defaultSourceName);
-        w->updating = false;
-    }
-
-    updateDefault();
-#endif
-    return;
-}
-#endif
-
-void DeviceWidget::executeVolumeUpdate() {
+void Device::executeVolumeUpdate() {
 
 }
 
 
-void DeviceWidget::prepareMenu() {
+void Device::prepareMenu() {
 
     log("activePort:%s", activePort.c_str());
     /* Fill the ComboBox's Tree Model */

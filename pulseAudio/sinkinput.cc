@@ -22,24 +22,24 @@
 #include <config.h>
 #endif
 
-#include "sinkinputwidget.h"
-#include "mainwindow.h"
-#include "sinkwidget.h"
+#include "sinkinput.h"
+#include "audiocore.h"
+#include "sink.h"
 
-SinkInputWidget::SinkInputWidget() {
-
-}
-
-
-SinkInputWidget::~SinkInputWidget(void) {
+SinkInput::SinkInput() {
 
 }
 
-uint32_t SinkInputWidget::sinkIndex() {
+
+SinkInput::~SinkInput(void) {
+
+}
+
+uint32_t SinkInput::sinkIndex() {
     return mSinkIndex;
 }
 
-void SinkInputWidget::moveSinkInput(const char *defName) {
+void SinkInput::moveSinkInput(const char *defName) {
 
   pa_operation* o;
   if (!(o = pa_context_move_sink_input_by_name(get_context(), index, defName, NULL, NULL))) {

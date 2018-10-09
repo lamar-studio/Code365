@@ -18,36 +18,40 @@
   along with pavucontrol. If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
+#ifndef card_h
+#define card_h
+
+#include "audiomanager.h"
+
+class PortInfo {
+public:
+      std::string name;
+      std::string description;
+      uint32_t priority;
+      int available;
+      int direction;
+      std::vector<std::string> profiles;
+};
+
+class Card {
+public:
+    Card();
+
+    std::string name;
+    uint32_t index;
+    bool updating;
+
+    std::vector< std::pair<std::string,std::string> > profiles;
+    std::map<std::string, PortInfo> ports;
+    std::string activeProfile;
+    bool hasSinks;
+    bool hasSources;
+
+    void prepareMenu();
+
+protected:
+  virtual void onProfileChange(uint32_t index, const char *profile);
+
+};
+
 #endif
-
-#include "sourceoutputwidget.h"
-#include "mainwindow.h"
-#include "sourcewidget.h"
-
-SourceOutputWidget::SourceOutputWidget() {
-
-}
-
-
-SourceOutputWidget::~SourceOutputWidget(void) {
-
-}
-
-
-uint32_t SourceOutputWidget::sourceIndex() {
-    return mSourceIndex;
-}
-
-void SourceOutputWidget::moveSourceOutput(uint32_t defIndex) {
-
-  pa_operation* o;
-  if (!(o = pa_context_move_source_output_by_index(get_context(), index, defIndex, NULL, NULL))) {
-    log("pa_context_move_source_output_by_index() failed");
-    return;
-  }
-
-  pa_operation_unref(o);
-}
-

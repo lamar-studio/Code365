@@ -22,28 +22,27 @@
 #include <config.h>
 #endif
 
-#include "sourcewidget.h"
+#include "sink.h"
 
-SourceWidget::SourceWidget() {
+Sink::Sink() {
 
 }
 
-void SourceWidget::setVolume(pa_volume_t v) {
+void Sink::updateVolume(pa_volume_t v) {
+
     updateChannelVolume(0, v, true);
-}
 
-void SourceWidget::executeVolumeUpdate() {
     pa_operation* o;
 
-    if (!(o = pa_context_set_source_volume_by_index(get_context(), index, &volume, NULL, NULL))) {
-        log("pa_context_set_source_volume_by_index() failed");
+    if (!(o = pa_context_set_sink_volume_by_index(get_context(), index, &volume, NULL, NULL))) {
+        log("pa_context_set_sink_volume_by_index() failed");
         return;
     }
 
     pa_operation_unref(o);
 }
 
-void SourceWidget::autoDefault() {
+void Sink::autoDefault(AudioCore *ac) {
 
     std::string usb_name;
     std::string hdmi_name;
@@ -51,16 +50,16 @@ void SourceWidget::autoDefault() {
     std::string def_name;
 
     uint32_t idx = 0;
-#if 0
-    for (std::map<uint32_t, SourceWidget*>::iterator i = sinkWidgets.begin(); i != sinkWidgets.end(); ++i) {
-        SourceWidget *w = i->second;
+
+    for (std::map<uint32_t, Sink*>::iterator i = ac->sinks.begin(); i != ac->sinks.end(); ++i) {
+        Sink *w = i->second;
         if (!w)
             continue;
 
-        if (strstr(w->prio_type, "USB") != NULL || strstr(w->prio_type, "usb") != NULL) {
+        if (strstr(w->prio_type.c_str(), "USB") != NULL || strstr(w->prio_type.c_str(), "usb") != NULL) {
             def_name = w->name;
             break;
-        } else if (strstr(w->prio_type, "HDMI") != NULL || strstr(w->prio_type, "hdmi") != NULL) {
+        } else if (strstr(w->prio_type.c_str(), "HDMI") != NULL || strstr(w->prio_type.c_str(), "hdmi") != NULL) {
             if (hdmi_name.empty())
                 hdmi_name = w->name;
             continue;
@@ -75,18 +74,21 @@ void SourceWidget::autoDefault() {
         def_name = hdmi_name.empty() ? ana_name : hdmi_name;
     }
 
-    updateDefault(def_name.c_str());
-#endif
+    mlog("[linzr]exit:%s def_name:%s", __FUNCTION__, def_name.c_str());
+    if (ac->defaultSinkName != def_name)
+        updateDefault(def_name.c_str());
 
 }
 
-void SourceWidget::updateDefault(const char *name) {
+
+void Sink::updateDefault(const char *name) {
     pa_operation* o;
 
-    if (!(o = pa_context_set_default_source(get_context(), name, NULL, NULL))) {
-        log("pa_context_set_default_source() failed");
+    if (!(o = pa_context_set_default_sink(get_context(), name, NULL, NULL))) {
+        log("pa_context_set_default_sink() failed");
         return;
     }
     pa_operation_unref(o);
 }
+
 

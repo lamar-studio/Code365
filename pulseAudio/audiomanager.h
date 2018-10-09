@@ -18,8 +18,8 @@
   along with pavucontrol. If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef pavucontrol_h
-#define pavucontrol_h
+#ifndef audiomanager_h
+#define audiomanager_h
 
 #include <signal.h>
 #include <string.h>
@@ -87,5 +87,35 @@ enum VolumeDirection {
 };
 
 pa_context* get_context(void);
+
+class listInfo {
+public:
+      std::string name;
+      std::string description;
+      std::string direction;
+};
+
+
+class AudioManager
+{
+public:
+    AudioManager();
+
+    int startPaService();
+    int stopPaService();
+    int connectPaService();
+
+    std::map<uint32_t, listInfo> getSoundDeviceList();
+    int setSoundDevicePath(uint32_t index, std::string name, std::string direction);
+    int setSoundVolume(uint32_t volume, std::string direction);
+
+protected:
+  virtual void onProfileChange(uint32_t index, const char *profile);
+
+private:
+
+
+};
+
 
 #endif

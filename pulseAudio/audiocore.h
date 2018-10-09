@@ -18,36 +18,29 @@
   along with pavucontrol. If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-#ifndef mainwindow_h
-#define mainwindow_h
+#ifndef audiocore_h
+#define audiocore_h
 
-#include "pavucontrol.h"
+#include "audiomanager.h"
 #include <pulse/ext-stream-restore.h>
-#if HAVE_EXT_DEVICE_RESTORE_API
-#  include <pulse/ext-device-restore.h>
-#endif
 
-class CardWidget;
-class SinkWidget;
-class SourceWidget;
-class SinkInputWidget;
-class SourceOutputWidget;
+class Card;
+class Sink;
+class Source;
+class SinkInput;
+class SourceOutput;
 
-class MainWindow {
+class AudioCore {
 public:
-    MainWindow();
-    virtual ~MainWindow();
+    AudioCore();
+    virtual ~AudioCore();
 
     void updateCard(const pa_card_info &info);
     bool updateSink(const pa_sink_info &info);
     void updateSource(const pa_source_info &info);
     void updateSinkInput(const pa_sink_input_info &info);
     void updateSourceOutput(const pa_source_output_info &info);
-    void updateClient(const pa_client_info &info);
     void updateServer(const pa_server_info &info);
-
-    void updateSinkDefault();
-    void updateSourceDefault();
 
     void removeCard(uint32_t index);
     void removeSink(uint32_t index);
@@ -56,20 +49,21 @@ public:
     void removeSourceOutput(uint32_t index);
     void removeClient(uint32_t index);
 
-    void removeAllWidgets();
-    void printAllWidgets();
+    void removeAll();
+    void printAll();
 
     int getDeviceList(char *list);
     void setSoundPath(uint32_t index, const char *profile);
-    int setSoundVolume(uint32_t volume, int direction);
-    void updateDefaultIdx();
+    int setSinkVolume(pa_volume_t vol);
+    int setSourceVolume(pa_volume_t vol);
+    int setDefaultSink(uint32_t index);
+    int setDefaultSource(uint32_t index);
 
-    std::map<uint32_t, CardWidget*> cardWidgets;
-    std::map<uint32_t, SinkWidget*> sinkWidgets;
-    std::map<uint32_t, SourceWidget*> sourceWidgets;
-    std::map<uint32_t, SinkInputWidget*> sinkInputWidgets;
-    std::map<uint32_t, SourceOutputWidget*> sourceOutputWidgets;
-    uint32_t usb_cnt, hdmi_cnt, analog_cnt;
+    std::map<uint32_t, Card*, std::greater<uint32_t>> cards;
+    std::map<uint32_t, Sink*, std::greater<uint32_t>> sinks;
+    std::map<uint32_t, Source*, std::greater<uint32_t>> sources;
+    std::map<uint32_t, SinkInput*, std::greater<uint32_t>> sinkInputs;
+    std::map<uint32_t, SourceOutput*, std::greater<uint32_t>> sourceOutputs;
 
     SinkInputType showSinkInputType;
     SinkType showSinkType;
@@ -82,6 +76,8 @@ protected:
 
 private:
     bool mManual;
+    uint32_t sinkNameToIndex(std::string name);
+    uint32_t sourceNameToIndex(std::string name);
 
 };
 
