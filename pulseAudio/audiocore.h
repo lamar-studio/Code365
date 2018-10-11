@@ -24,11 +24,55 @@
 #include "audiomanager.h"
 #include <pulse/ext-stream-restore.h>
 
+
+enum SinkInputType {
+    SINK_INPUT_ALL,
+    SINK_INPUT_CLIENT,
+    SINK_INPUT_VIRTUAL
+};
+
+enum SinkType {
+    SINK_ALL,
+    SINK_HARDWARE,
+    SINK_VIRTUAL,
+};
+
+enum SourceOutputType {
+    SOURCE_OUTPUT_ALL,
+    SOURCE_OUTPUT_CLIENT,
+    SOURCE_OUTPUT_VIRTUAL
+};
+
+enum SourceType {
+    SOURCE_ALL,
+    SOURCE_NO_MONITOR,
+    SOURCE_HARDWARE,
+    SOURCE_VIRTUAL,
+    SOURCE_MONITOR,
+};
+
+enum VolumeDirection {
+    SINK,
+    SOURCE,
+};
+
+
 class Card;
 class Sink;
 class Source;
 class SinkInput;
 class SourceOutput;
+
+class listInfo {
+public:
+      uint32_t index;
+      std::string name;
+      std::string description;
+      std::string def;
+      std::string direction;
+      std::string status;
+};
+
 
 class AudioCore {
 public:
@@ -52,8 +96,9 @@ public:
     void removeAll();
     void printAll();
 
-    int getDeviceList(char *list);
-    void setSoundPath(uint32_t index, const char *profile);
+    void updateDeviceList();
+    std::vector<listInfo> getDeviceList();
+    void changeProfile(uint32_t index, std::string name);
     int setSinkVolume(pa_volume_t vol);
     int setSourceVolume(pa_volume_t vol);
     int setDefaultSink(uint32_t index);
@@ -64,6 +109,7 @@ public:
     std::map<uint32_t, Source*, std::greater<uint32_t>> sources;
     std::map<uint32_t, SinkInput*, std::greater<uint32_t>> sinkInputs;
     std::map<uint32_t, SourceOutput*, std::greater<uint32_t>> sourceOutputs;
+    std::vector<listInfo> devList;
 
     SinkInputType showSinkInputType;
     SinkType showSinkType;
@@ -76,6 +122,8 @@ protected:
 
 private:
     bool mManual;
+    std::string hdmiProfile;
+    std::string analogProfile;
     uint32_t sinkNameToIndex(std::string name);
     uint32_t sourceNameToIndex(std::string name);
 

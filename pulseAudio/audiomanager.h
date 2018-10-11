@@ -32,20 +32,10 @@
 #include <libintl.h>
 #include <vector>
 #include <fstream>
-
+#include <unistd.h>
 #include <pulse/pulseaudio.h>
 
-#ifndef GLADE_FILE
-#define GLADE_FILE "pavucontrol.glade"
-#endif
-
-/* Can be removed when PulseAudio 0.9.23 or newer is required */
-#ifndef PA_VOLUME_UI_MAX
-# define PA_VOLUME_UI_MAX (pa_sw_volume_from_dB(+11.0))
-#endif
-
-#define HAVE_SOURCE_OUTPUT_VOLUMES PA_CHECK_VERSION(0,99,0)
-#define HAVE_EXT_DEVICE_RESTORE_API PA_CHECK_VERSION(0,99,0)
+#include "audiocore.h"
 
 #define DEBUG     (1)
 #define log(format, args...)  printf(format"\n", ##args)
@@ -54,65 +44,31 @@
             if(DEBUG) printf(format"\n", ##args);             \
         } while(0)
 
-
-enum SinkInputType {
-    SINK_INPUT_ALL,
-    SINK_INPUT_CLIENT,
-    SINK_INPUT_VIRTUAL
-};
-
-enum SinkType {
-    SINK_ALL,
-    SINK_HARDWARE,
-    SINK_VIRTUAL,
-};
-
-enum SourceOutputType {
-    SOURCE_OUTPUT_ALL,
-    SOURCE_OUTPUT_CLIENT,
-    SOURCE_OUTPUT_VIRTUAL
-};
-
-enum SourceType {
-    SOURCE_ALL,
-    SOURCE_NO_MONITOR,
-    SOURCE_HARDWARE,
-    SOURCE_VIRTUAL,
-    SOURCE_MONITOR,
-};
-
-enum VolumeDirection {
-    SINK,
-    SOURCE,
-};
-
 pa_context* get_context(void);
 
-class listInfo {
-public:
-      std::string name;
-      std::string description;
-      std::string direction;
-};
-
+class AudioCore;
+class listInfo;
 
 class AudioManager
 {
 public:
     AudioManager();
 
+    static AudioManager* getInstance();
+    static void* main_loop(void *arg);
     int startPaService();
     int stopPaService();
-    int connectPaService();
 
-    std::map<uint32_t, listInfo> getSoundDeviceList();
+    void printDeviceList();
     int setSoundDevicePath(uint32_t index, std::string name, std::string direction);
     int setSoundVolume(uint32_t volume, std::string direction);
 
 protected:
-  virtual void onProfileChange(uint32_t index, const char *profile);
 
 private:
+    static AudioManager *mInstance;
+    static AudioCore *mAC;
+    std::vector<listInfo> devList;
 
 
 };

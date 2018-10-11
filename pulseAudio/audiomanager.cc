@@ -22,7 +22,6 @@
 #include <config.h>
 #endif
 
-#include <unistd.h>
 #include <thread>
 #include <pulse/pulseaudio.h>
 #include <pulse/ext-stream-restore.h>
@@ -34,23 +33,21 @@
 #include "source.h"
 #include "sinkinput.h"
 #include "sourceoutput.h"
-#include "audiocore.h"
 
 static pa_context* context = NULL;
 static pa_mainloop_api* api = NULL;
+static pa_mainloop *m = NULL;
 static int n_outstanding = 0;
 static int default_tab = 0;
 static bool retry = false;
 static int reconnect_timeout = 1;
 static bool reconnect_running = false;
 static bool connected = false;
+static int retval = 0;
 
-#define DEBUG     (1)
-#define log(format, args...)  printf(format"\n", ##args)
-#define mlog(format, args...)                                 \
-    do {                                                      \
-            if(DEBUG) printf(format"\n", ##args);             \
-        } while(0)
+AudioManager* AudioManager::mInstance = NULL;
+AudioCore* AudioManager::mAC = NULL;
+
 
 void card_cb(pa_context *, const pa_card_info *i, int eol, void *userdata) {
     AudioCore *w = static_cast<AudioCore*>(userdata);
@@ -102,9 +99,6 @@ void source_cb(pa_context *, const pa_source_info *i, int eol, void *userdata) {
     if (eol > 0) {
         return;
     }
-
-    //if (strstr(i->name, "monitor") != NULL)
-    //    return;
 
     if (i->monitor_of_sink != PA_INVALID_INDEX)
         return;
@@ -379,6 +373,7 @@ bool connect_to_pulse(void *userdata) {
 
     if (context)
         return false;
+
     mlog("enter:%s", __FUNCTION__);
     pa_proplist *proplist = pa_proplist_new();
     pa_proplist_sets(proplist, PA_PROP_APPLICATION_NAME, "PulseAudio Volume Control");
@@ -392,7 +387,6 @@ bool connect_to_pulse(void *userdata) {
 
     pa_context_set_state_callback(context, context_state_callback, w);
 
-    //w->setConnectingMessage();
     if (pa_context_connect(context, NULL, PA_CONTEXT_NOFAIL, NULL) < 0) {
         if (pa_context_errno(context) == PA_ERR_INVALID) {
             log("Connection to PulseAudio failed. Automatic retry in 5s");
@@ -413,37 +407,55 @@ bool connect_to_pulse(void *userdata) {
     return false;
 }
 
-//主函数入口
-int main(int argc, char *argv[]) {
+void* AudioManager::main_loop(void *arg) {
 
-    signal(SIGPIPE, SIG_IGN);
+    pthread_detach(pthread_self());
 
-    AudioCore *ac = new AudioCore();
-
-    pa_mainloop *m = pa_mainloop_new();
+    m = pa_mainloop_new();
     //g_assert(m);
     api = pa_mainloop_get_api(m);
     //g_assert(api);
 
-    connect_to_pulse(ac);
-    int ret;
+    connect_to_pulse(mAC);
     if (reconnect_timeout >= 0)
-        pa_mainloop_run(m, &ret);
-
-    if (reconnect_timeout < 0)
+        pa_mainloop_run(m, &retval);
+    else
         log("Fatal Error: Unable to connect to PulseAudio");
 
-    delete ac;
+    return NULL;
 
-    if (context)
-        pa_context_unref(context);
-    pa_mainloop_free(m);
-
-    return 0;
 }
 
 
+
+AudioManager::AudioManager() {
+
+}
+
+
+AudioManager* AudioManager::getInstance() {
+
+    if (mInstance == NULL) {
+        mInstance = new AudioManager();
+        mAC = new AudioCore();
+    }
+
+    return mInstance;
+}
+
+
+
+
 int AudioManager::startPaService() {
+
+    pthread_t pid_t;
+
+    if (pthread_create(&pid_t, NULL, main_loop, NULL) == -1) {
+        log("pthread_create err");
+        return -1;
+    }
+    return 0;
+
     //1. modprobe module
     //2. systemctl start service
 }
@@ -451,36 +463,51 @@ int AudioManager::startPaService() {
 int AudioManager::stopPaService() {
     //1. systemctl stop service
     //2. modprobe -r module
+
+    if (context) {
+        pa_context_disconnect(context);
+        pa_mainloop_quit(m, retval);
+        pa_mainloop_free(m);
+    }
+
+    return retval;
 }
 
-int AudioManager::connectPaService() {
+void AudioManager::printDeviceList() {
 
-    AudioCore *ac = new AudioCore();
+    devList = mAC->getDeviceList();
 
-    pa_mainloop *m = pa_mainloop_new();
-    //g_assert(m);
-    api = pa_mainloop_get_api(m);
-    //g_assert(api);
+    mlog("print the List:");
+    for (uint32_t i = 0; i < devList.size(); ++i) {
+        mlog("idx:%d name:%s desc:%s dir:%s def:%s status:%s", devList[i].index, devList[i].name.c_str(), devList[i].description.c_str(), devList[i].direction.c_str(), devList[i].def.c_str(), devList[i].status.c_str());
+    }
 
-    connect_to_pulse(ac);
 }
 
+int AudioManager::setSoundDevicePath(uint32_t index, std::string name, std::string direction) {
 
+    int ret = 0;
 
+    if (strstr(name.c_str(), "Built-in") != NULL) {
+        mAC->changeProfile(index, name);
+    } else {
+        if (direction == "OUT") {
+            ret = mAC->setDefaultSink(index);
+        } else if (direction == "IN") {
+            ret = mAC->setDefaultSource(index);
+        } else {
+            log("no found the type");
+        }
+    }
 
+    return ret;
+}
 
+int AudioManager::setSoundVolume(uint32_t volume, std::string direction) {
+    log("todo: set vol");
 
-
-
-
-
-
-
-
-
-
-
-
+    return 0;
+}
 
 
 

@@ -89,8 +89,9 @@ static void updatePorts(Device *w, std::map<std::string, PortInfo> &ports) {
         p = it->second;
         desc = p.description;
 
-        if (p.available == PA_PORT_AVAILABLE_YES)
+        if (p.available == PA_PORT_AVAILABLE_YES) {
             desc +=  " (plugged in)";
+        }
         else if (p.available == PA_PORT_AVAILABLE_NO) {
             if (p.name == "analog-output-speaker" ||
                 p.name == "analog-input-microphone-internal")
@@ -135,6 +136,9 @@ uint32_t AudioCore::sourceNameToIndex(std::string name) {
 void AudioCore::updateCard(const pa_card_info &info) {
     Card *w;
     bool is_new = false;
+    bool is_first_hdmi = true;
+    bool is_first_analog = true;
+    bool is_avalible = false;
     std::set<pa_card_profile_info, profile_prio_compare> profile_priorities;
     mlog("[linzr]enter:%s name:%s", __FUNCTION__, info.name);
     if (cards.count(info.index))
@@ -154,7 +158,7 @@ void AudioCore::updateCard(const pa_card_info &info) {
         profile_priorities.insert(info.profiles[i]);
     }
 
-    //保存端口信息
+    //ports info
     w->ports.clear();
     for (uint32_t i = 0; i < info.n_ports; ++i) {
         PortInfo p;
@@ -170,7 +174,7 @@ void AudioCore::updateCard(const pa_card_info &info) {
         w->ports[p.name] = p;
     }
 
-    //保存列表,并更新设备的连接状态
+    //profiles info
     w->profiles.clear();
     for (std::set<pa_card_profile_info>::iterator profileIt = profile_priorities.begin(); profileIt != profile_priorities.end(); ++profileIt) {
         bool hasNo = false, hasOther = false;
@@ -181,7 +185,9 @@ void AudioCore::updateCard(const pa_card_info &info) {
             PortInfo port = portIt->second;
 
             //if (std::find(port.profiles.begin(), port.profiles.end(), profileIt->name) == port.profiles.end())
-            //    continue;
+             //   continue;
+            if (port.available == PA_PORT_AVAILABLE_YES)
+                is_avalible = true;
 
             if (port.available == PA_PORT_AVAILABLE_NO)
                 hasNo = true;
@@ -189,39 +195,26 @@ void AudioCore::updateCard(const pa_card_info &info) {
                 hasOther = true;
                 break;
             }
+
         }
         if (hasNo && !hasOther)
             desc += "(unplugged)";
 
+        if (strstr(info.name, "pci") != NULL) {
+            if (strstr(profileIt->name, "hdmi") != NULL
+                && is_first_hdmi == true ) {
+                hdmiProfile = profileIt->name;
+                is_first_hdmi = false;
+            }
+
+            if (strstr(profileIt->name, "analog") != NULL
+                && is_first_analog == true) {
+                analogProfile = profileIt->name;
+                is_first_analog = false;
+            }
+        }
+
         w->profiles.push_back(std::pair<std::string,std::string>(profileIt->name, desc));
-    }
-
-    w->activeProfile = info.active_profile ? info.active_profile->name : "";
-
-    /* Because the port info for sinks and sources is discontinued we need
-     * to update the port info for them here. */
-    if (w->hasSinks) {
-        std::map<uint32_t, Sink*>::iterator it;
-
-        for (it = sinks.begin() ; it != sinks.end(); it++) {
-            Sink *sw = it->second;
-
-            if (sw->card_index == w->index) {
-                updatePorts(sw, w->ports);
-            }
-        }
-    }
-
-    if (w->hasSources) {
-        std::map<uint32_t, Source*>::iterator it;
-
-        for (it = sources.begin() ; it != sources.end(); it++) {
-            Source *sw = it->second;
-
-            if (sw->card_index == w->index) {
-                updatePorts(sw, w->ports);
-            }
-        }
     }
 
     w->prepareMenu();
@@ -250,7 +243,6 @@ bool AudioCore::updateSink(const pa_sink_info &info) {
     w->name = info.name;
     w->description = info.description;
     w->type = info.flags & PA_SINK_HARDWARE ? SINK_HARDWARE : SINK_VIRTUAL;
-
 
     port_priorities.clear();
     for (uint32_t i=0; i<info.n_ports; ++i) {
@@ -295,9 +287,6 @@ void AudioCore::updateSource(const pa_source_info &info) {
     w->name = info.name;
     w->description = info.description;
     w->type = info.monitor_of_sink != PA_INVALID_INDEX ? SOURCE_MONITOR : (info.flags & PA_SOURCE_HARDWARE ? SOURCE_HARDWARE : SOURCE_VIRTUAL);
-
-    if (!mManual)
-        //w->autoDefault(this);
 
     port_priorities.clear();
     for (uint32_t i=0; i<info.n_ports; ++i) {
@@ -462,31 +451,86 @@ void AudioCore::printAll() {
         mlog("source:%s (%d)", it->second->name.c_str(), it->second->index);
     for (std::map<uint32_t, Card*>::iterator it = cards.begin(); it != cards.end(); ++it)
         mlog("card:%s (%d)", it->second->name.c_str(), it->second->index);
+
+    mlog("[linzr]exit:%s hdmiprofile:%s analogProfile:%s", __FUNCTION__, hdmiProfile.c_str(), analogProfile.c_str());
 }
 
 //new interface
-int AudioCore::getDeviceList(char *list) {
+void AudioCore::updateDeviceList() {
 
-    for (std::map<uint32_t, Card*>::iterator it = cards.begin(); it != cards.end(); ++it) {
-        Card *c = it->second;
-        log("CARD[%d]:", c->index);
-        for (uint32_t i = 0; i < c->profiles.size(); ++i) {
-            log("profile.name:%s profile.desc:%s", c->profiles[i].first.c_str(), c->profiles[i].second.c_str());
+    devList.clear();
+    for (std::map<uint32_t, Sink*>::iterator it = sinks.begin(); it != sinks.end(); ++it) {
+        Sink *w = it->second;
+        listInfo l;
+
+        if (w->name == defaultSinkName)
+            l.def = "true";
+        else
+            l.def= "false";
+
+        //virtual device for Built-in
+        if (strstr(w->description.c_str(), "Built-in")) {
+            l.index = w->index;
+            l.direction = "OUT";
+            l.name = analogProfile;
+            l.description = "Built-in (Analog)";
+            devList.push_back(l);
+
+            if (!hdmiProfile.empty()) {
+                l.name = hdmiProfile;
+                l.description = "Built-in (HDMI)";
+                devList.push_back(l);
+            }
+
+            continue;
         }
+
+        l.index = w->index;
+        l.name = w->name;
+        l.description = w->description;
+        l.direction = "OUT";
+
+        devList.push_back(l);
     }
+
+    for (std::map<uint32_t, Source*>::iterator it = sources.begin(); it != sources.end(); ++it) {
+        Source *s = it->second;
+        listInfo l;
+
+        if (s->name == defaultSourceName)
+            l.def = "true";
+        else
+            l.def = "false";
+
+        l.index = s->index;
+        l.name = s->name;
+        l.description = s->description;
+        l.direction = "IN";
+
+        devList.push_back(l);
+    }
+
 }
 
-void AudioCore::setSoundPath(uint32_t index, const char *profile) { //profile.second
+std::vector<listInfo> AudioCore::getDeviceList() {
 
-    mManual = true;
-    pa_operation* o;
+    updateDeviceList();
+    return devList;
+}
 
-    if (!(o = pa_context_set_card_profile_by_index(get_context(), index, profile, NULL, NULL))) {
-        log("pa_context_set_card_profile_by_index() failed");
-        return;
+void AudioCore::changeProfile(uint32_t index, std::string name) { //profile.second
+
+    if (sinks.count(index)) {
+        Sink *sink = sinks[index];
+
+        pa_operation* o;
+
+        if (!(o = pa_context_set_card_profile_by_index(get_context(), sink->card_index, name.c_str(), NULL, NULL))) {
+            log("pa_context_set_card_profile_by_index() failed");
+            return;
+        }
+        pa_operation_unref(o);
     }
-    pa_operation_unref(o);
-
 }
 
 int AudioCore::setSinkVolume(pa_volume_t vol) {
@@ -498,7 +542,6 @@ int AudioCore::setSinkVolume(pa_volume_t vol) {
 
     return 0;
 }
-
 
 int AudioCore::setSourceVolume(pa_volume_t vol) {
 

@@ -43,7 +43,6 @@ public:
 
     std::vector< std::pair<std::string,std::string> > profiles;
     std::map<std::string, PortInfo> ports;
-    std::string activeProfile;
     bool hasSinks;
     bool hasSources;
 

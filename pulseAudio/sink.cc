@@ -25,7 +25,6 @@
 #include "sink.h"
 
 Sink::Sink() {
-
 }
 
 void Sink::updateVolume(pa_volume_t v) {
