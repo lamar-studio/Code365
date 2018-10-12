@@ -10,11 +10,13 @@ int main(int argc, char *argv[]) {
     AudioManager *am = new AudioManager();
 
     ret = am->startPaService();
-    log("---test start---2");
-    sleep(1000);
+    sleep(60);
+    am->print();
     ret = am->stopPaService();
-    sleep(2);
+    sleep(1);
     log("---test end---ret:%d", ret);
+
+    delete am;
 
     return 0;
 }

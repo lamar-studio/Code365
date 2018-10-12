@@ -1,22 +1,3 @@
-/***
-  This file is part of pavucontrol.
-
-  Copyright 2006-2008 Lennart Poettering
-  Copyright 2009 Colin Guthrie
-
-  pavucontrol is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 2 of the License, or
-  (at your option) any later version.
-
-  pavucontrol is distributed in the hope that it will be useful, but
-  WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-  General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with pavucontrol. If not, see <http://www.gnu.org/licenses/>.
-***/
 
 #ifndef audiocore_h
 #define audiocore_h
@@ -42,8 +23,7 @@
             if(DEBUG) printf(format"\n", ##args);             \
         } while(0)
 
-pa_context* get_context(void);
-
+static pa_context* get_context(void);
 
 class Sink;
 class Source;
@@ -55,6 +35,17 @@ public:
     AudioCore();
     virtual ~AudioCore();
     static AudioCore* getInstance();
+    bool paStart();
+    bool paStop();
+    bool paConnect(void *userdata);
+
+    static void sink_cb(pa_context *c, const pa_sink_info *i, int eol, void *userdata);
+    static void sink_input_cb(pa_context *, const pa_sink_input_info *i, int eol, void *userdata);
+    static void source_output_cb(pa_context *, const pa_source_output_info *i, int eol, void *userdata);
+    static void source_cb(pa_context *, const pa_source_info *i, int eol, void *userdata);
+    static void server_info_cb(pa_context *, const pa_server_info *i, void *userdata);
+    static void subscribe_cb(pa_context *c, pa_subscription_event_type_t t, uint32_t index, void *userdata);
+    static void context_state_callback(pa_context *c, void *userdata);
 
     void updateSink(const pa_sink_info &info);
     void updateSource(const pa_source_info &info);
@@ -73,10 +64,20 @@ public:
     int setSinkVolume(pa_volume_t vol);
     int setSourceVolume(pa_volume_t vol);
 
+    static void* main_loop(void *arg);
+
     std::map<uint32_t, Sink*, std::greater<uint32_t>> sinks;
     std::map<uint32_t, Source*, std::greater<uint32_t>> sources;
     std::map<uint32_t, SinkInput*, std::greater<uint32_t>> sinkInputs;
     std::map<uint32_t, SourceOutput*, std::greater<uint32_t>> sourceOutputs;
+
+    pa_context *context;
+    pa_mainloop_api* api;
+    pa_mainloop *m;
+    int n_outstanding;
+    bool retry;
+    int reconnect_timeout;
+    int retval;
 
 protected:
 
@@ -86,6 +87,5 @@ private:
     static AudioCore* mInstance;
 
 };
-
 
 #endif
