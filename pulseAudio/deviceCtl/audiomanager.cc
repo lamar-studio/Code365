@@ -1,4 +1,5 @@
 
+#include "audiocore.h"
 #include "audiomanager.h"
 
 AudioManager::AudioManager() {
@@ -7,14 +8,18 @@ AudioManager::AudioManager() {
 
 int AudioManager::startPaService() {
     //1.modprobe module
-    //2.systemctl start service
+    //system("systemctl start pulseaudio-rcd.service");
+    //system("pulseaudio --start --log-target=syslog");
     return (AudioCore::getInstance()->paStart() == true) ? 0 : -1;
 }
 
 int AudioManager::stopPaService() {
-    return (AudioCore::getInstance()->paStop() == true) ? 0 : -1;
-    //1. systemctl stop service
+
+    int ret = (AudioCore::getInstance()->paStop() == true) ? 0 : -1;
+    //system("systemctl stop pulseaudio-rcd.service");
+    //system("pulseaudio -k");
     //2. modprobe -r module
+    return ret;
 }
 
 //just test

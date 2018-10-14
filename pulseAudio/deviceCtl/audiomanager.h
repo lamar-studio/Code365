@@ -2,10 +2,6 @@
 #ifndef audiomanager_h
 #define audiomanager_h
 
-#include "audiocore.h"
-
-class AudioCore;
-
 class AudioManager
 {
 public:

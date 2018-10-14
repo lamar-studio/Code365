@@ -7,6 +7,7 @@
 class Sink : public Device {
 public:
     Sink();
+    virtual ~Sink();
 
     virtual void updateVolume(pa_volume_t v);
     virtual void updateDefault(const char *name);

@@ -2,17 +2,10 @@
 #ifndef audiocore_h
 #define audiocore_h
 
-#include <signal.h>
-#include <string.h>
-#include <iostream>
-#include <sstream>
 #include <string>
 #include <cstring>
-#include <cstdlib>
 #include <map>
 #include <libintl.h>
-#include <vector>
-#include <fstream>
 #include <unistd.h>
 #include <pulse/pulseaudio.h>
 
@@ -22,8 +15,6 @@
     do {                                                      \
             if(DEBUG) printf(format"\n", ##args);             \
         } while(0)
-
-static pa_context* get_context(void);
 
 class Sink;
 class Source;
@@ -35,17 +26,50 @@ public:
     AudioCore();
     virtual ~AudioCore();
     static AudioCore* getInstance();
+    static void *main_loop(void *arg);
+    static void sink_cb (
+        pa_context *c,
+        const pa_sink_info *i,
+        int eol,
+        void *userdata
+        );
+    static void sink_input_cb (
+        pa_context *c,
+        const pa_sink_input_info *i,
+        int eol,
+        void *userdata
+        );
+    static void source_output_cb (
+        pa_context *c,
+        const pa_source_output_info *i,
+        int eol,
+        void *userdata
+        );
+    static void source_cb (
+        pa_context *c,
+        const pa_source_info *i,
+        int eol,
+        void *userdata
+        );
+    static void server_info_cb (
+        pa_context *c,
+        const pa_server_info *i,
+        void *userdata
+        );
+    static void subscribe_cb (
+        pa_context *c,
+        pa_subscription_event_type_t t,
+        uint32_t index,
+        void *userdata
+        );
+    static void context_state_callback (
+        pa_context *c,
+        void *userdata
+        );
+
     bool paStart();
     bool paStop();
     bool paConnect(void *userdata);
-
-    static void sink_cb(pa_context *c, const pa_sink_info *i, int eol, void *userdata);
-    static void sink_input_cb(pa_context *, const pa_sink_input_info *i, int eol, void *userdata);
-    static void source_output_cb(pa_context *, const pa_source_output_info *i, int eol, void *userdata);
-    static void source_cb(pa_context *, const pa_source_info *i, int eol, void *userdata);
-    static void server_info_cb(pa_context *, const pa_server_info *i, void *userdata);
-    static void subscribe_cb(pa_context *c, pa_subscription_event_type_t t, uint32_t index, void *userdata);
-    static void context_state_callback(pa_context *c, void *userdata);
 
     void updateSink(const pa_sink_info &info);
     void updateSource(const pa_source_info &info);
@@ -57,14 +81,11 @@ public:
     void removeSource(uint32_t index);
     void removeSinkInput(uint32_t index);
     void removeSourceOutput(uint32_t index);
-
     void removeAll();
     void printAll();
 
     int setSinkVolume(pa_volume_t vol);
     int setSourceVolume(pa_volume_t vol);
-
-    static void* main_loop(void *arg);
 
     std::map<uint32_t, Sink*, std::greater<uint32_t>> sinks;
     std::map<uint32_t, Source*, std::greater<uint32_t>> sources;
@@ -72,20 +93,29 @@ public:
     std::map<uint32_t, SourceOutput*, std::greater<uint32_t>> sourceOutputs;
 
     pa_context *context;
-    pa_mainloop_api* api;
+    pa_mainloop_api *api;
     pa_mainloop *m;
-    int n_outstanding;
-    bool retry;
-    int reconnect_timeout;
+    int retry;
     int retval;
 
-protected:
-
 private:
+    class GC {
+    public:
+        ~GC() {
+            if (mInstance != NULL) {
+                delete mInstance;
+                mInstance = NULL;
+            }
+        }
+    };
+
+    static void init();
+
     std::string defaultSinkName, defaultSourceName;
     uint32_t defaultSinkIdx, defaultSourceIdx;
-    static AudioCore* mInstance;
-
+    static pthread_once_t mOnce;
+    static AudioCore *mInstance;
+    static GC mGc;
 };
 
 #endif

@@ -6,28 +6,25 @@ Source::Source() {
 
 }
 
+Source::~Source() {
+
+}
+
 void Source::updateVolume(pa_volume_t v) {
-
     updateChannelVolume(0, v, true);
-
     pa_operation* o;
 
     if (!(o = pa_context_set_source_volume_by_index(AudioCore::getInstance()->context, index, &volume, NULL, NULL))) {
         log("pa_context_set_source_volume_by_index() failed");
         return;
     }
-
     pa_operation_unref(o);
 }
 
 void Source::autoDefault(AudioCore *ac) {
-
-    std::string usb_name;
     std::string hdmi_name;
     std::string ana_name;
     std::string def_name;
-
-    uint32_t idx = 0;
 
     for (std::map<uint32_t, Source*>::iterator i = ac->sources.begin(); i != ac->sources.end(); ++i) {
         Source *w = i->second;
@@ -54,6 +51,7 @@ void Source::autoDefault(AudioCore *ac) {
 
     mlog("[Source]autoDefault:%s",def_name.c_str());
     updateDefault(def_name.c_str());
+
     //move sourceOutput to default
     for (std::map<uint32_t, SourceOutput*>::iterator it = ac->sourceOutputs.begin(); it != ac->sourceOutputs.end(); ++it)
         it->second->moveSourceOutput(def_name.c_str());

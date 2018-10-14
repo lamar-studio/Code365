@@ -1,22 +1,22 @@
 
-#include <set>
-
 #include "audiocore.h"
 #include "sink.h"
 #include "source.h"
 #include "sinkinput.h"
 #include "sourceoutput.h"
 
-AudioCore *AudioCore::mInstance = NULL;
+AudioCore*      AudioCore::mInstance = NULL;
+AudioCore::GC   AudioCore::mGc;
+pthread_once_t  AudioCore::mOnce;
 
 AudioCore::AudioCore()
     : context(NULL),
       api(NULL),
-      n_outstanding(0),
-      retry(false),
-      reconnect_timeout(1),
-      retval(0) {
-    log("AudioCore");
+      m(NULL),
+      retry(3),
+      retval(0),
+      defaultSinkIdx(0),
+      defaultSourceIdx(0) {
 
 }
 
@@ -25,12 +25,12 @@ AudioCore::~AudioCore() {
 }
 
 AudioCore* AudioCore::getInstance() {
-
-    if (mInstance == NULL) {
-        mInstance = new AudioCore();
-    }
-
+    pthread_once(&mOnce, init);
     return mInstance;
+}
+
+void AudioCore::init() {
+    mInstance = new AudioCore();
 }
 
 void AudioCore::sink_cb(pa_context *c, const pa_sink_info *i, int eol, void *userdata) {
@@ -78,7 +78,6 @@ void AudioCore::source_output_cb(pa_context *, const pa_source_output_info *i, i
     }
 
     if (eol > 0) {
-        w->printAll();
         return;
     }
 
@@ -119,7 +118,7 @@ void AudioCore::subscribe_cb(pa_context *c, pa_subscription_event_type_t t, uint
     AudioCore *w = static_cast<AudioCore*>(userdata);
     mlog("[linzr]enter:%s case:%#x", __FUNCTION__, t & PA_SUBSCRIPTION_EVENT_FACILITY_MASK);
     switch (t & PA_SUBSCRIPTION_EVENT_FACILITY_MASK) {
-        case PA_SUBSCRIPTION_EVENT_SINK: // 0x0000U
+        case PA_SUBSCRIPTION_EVENT_SINK:     //0x0000U
             if ((t & PA_SUBSCRIPTION_EVENT_TYPE_MASK) == PA_SUBSCRIPTION_EVENT_REMOVE)
                 w->removeSink(index);
             else {
@@ -132,7 +131,7 @@ void AudioCore::subscribe_cb(pa_context *c, pa_subscription_event_type_t t, uint
             }
             break;
 
-        case PA_SUBSCRIPTION_EVENT_SOURCE: //0x0001U
+        case PA_SUBSCRIPTION_EVENT_SOURCE:     //0x0001U
             if ((t & PA_SUBSCRIPTION_EVENT_TYPE_MASK) == PA_SUBSCRIPTION_EVENT_REMOVE)
                 w->removeSource(index);
             else {
@@ -145,7 +144,7 @@ void AudioCore::subscribe_cb(pa_context *c, pa_subscription_event_type_t t, uint
             }
             break;
 
-        case PA_SUBSCRIPTION_EVENT_SINK_INPUT: //0x0002U
+        case PA_SUBSCRIPTION_EVENT_SINK_INPUT:     //0x0002U
             if ((t & PA_SUBSCRIPTION_EVENT_TYPE_MASK) == PA_SUBSCRIPTION_EVENT_REMOVE)
                 w->removeSinkInput(index);
             else {
@@ -158,7 +157,7 @@ void AudioCore::subscribe_cb(pa_context *c, pa_subscription_event_type_t t, uint
             }
             break;
 
-        case PA_SUBSCRIPTION_EVENT_SOURCE_OUTPUT: //0x0003U
+        case PA_SUBSCRIPTION_EVENT_SOURCE_OUTPUT:     //0x0003U
             if ((t & PA_SUBSCRIPTION_EVENT_TYPE_MASK) == PA_SUBSCRIPTION_EVENT_REMOVE)
                 w->removeSourceOutput(index);
             else {
@@ -171,7 +170,7 @@ void AudioCore::subscribe_cb(pa_context *c, pa_subscription_event_type_t t, uint
             }
             break;
 
-        case PA_SUBSCRIPTION_EVENT_SERVER: { //0x0007U
+        case PA_SUBSCRIPTION_EVENT_SERVER: {     //0x0007U
                 pa_operation *o;
                 if (!(o = pa_context_get_server_info(c, server_info_cb, w))) {
                     log("pa_context_get_server_info() failed");
@@ -186,7 +185,6 @@ void AudioCore::subscribe_cb(pa_context *c, pa_subscription_event_type_t t, uint
 void AudioCore::context_state_callback(pa_context *c, void *userdata) {
     AudioCore *w = static_cast<AudioCore*>(userdata);
 
-    //g_assert(c);
     mlog("enter:%s state:%d", __FUNCTION__, pa_context_get_state(c));
     switch (pa_context_get_state(c)) {
         case PA_CONTEXT_UNCONNECTED:
@@ -198,10 +196,7 @@ void AudioCore::context_state_callback(pa_context *c, void *userdata) {
         case PA_CONTEXT_READY: {
             pa_operation *o;
 
-            w->reconnect_timeout = 1;
-
             pa_context_set_subscribe_callback(c, subscribe_cb, w);
-
             if (!(o = pa_context_subscribe(c, (pa_subscription_mask_t)
                                            (PA_SUBSCRIPTION_MASK_SINK|
                                             PA_SUBSCRIPTION_MASK_SOURCE|
@@ -212,54 +207,46 @@ void AudioCore::context_state_callback(pa_context *c, void *userdata) {
             }
             pa_operation_unref(o);
 
-            /* Keep track of the outstanding callbacks for UI tweaks */
-            w->n_outstanding = 0;
-
             if (!(o = pa_context_get_server_info(c, server_info_cb, w))) {
                 log("pa_context_get_server_info() failed");
                 return;
             }
             pa_operation_unref(o);
-            w->n_outstanding++;
 
             if (!(o = pa_context_get_sink_info_list(c, sink_cb, w))) {
                 log("pa_context_get_sink_info_list() failed");
                 return;
             }
             pa_operation_unref(o);
-            w->n_outstanding++;
 
             if (!(o = pa_context_get_source_info_list(c, source_cb, w))) {
                 log("pa_context_get_source_info_list() failed");
                 return;
             }
             pa_operation_unref(o);
-            w->n_outstanding++;
 
             if (!(o = pa_context_get_sink_input_info_list(c, sink_input_cb, w))) {
                 log("pa_context_get_sink_input_info_list() failed");
                 return;
             }
             pa_operation_unref(o);
-            w->n_outstanding++;
 
             if (!(o = pa_context_get_source_output_info_list(c, source_output_cb, w))) {
                 log("pa_context_get_source_output_info_list() failed");
                 return;
             }
             pa_operation_unref(o);
-            w->n_outstanding++;
 
             break;
         }
 
+        //the pulseaudio interrupt.
         case PA_CONTEXT_FAILED: {
             w->removeAll();
             pa_context_unref(w->context);
             w->context = NULL;
-
-            mInstance->paConnect(w);
-            return;
+            w->paConnect(w);
+            break;
         }
 
         case PA_CONTEXT_TERMINATED:
@@ -270,39 +257,30 @@ void AudioCore::context_state_callback(pa_context *c, void *userdata) {
     }
 }
 
-
 bool AudioCore::paConnect(void *userdata) {
     AudioCore *w = static_cast<AudioCore*>(userdata);
-    log("enter paConnect");
+    log("enter paConnect w:%d instance:%d", w->retval, mInstance->retval);
 
-    if (context)
+    if (w->context)
         return false;
 
-    context = pa_context_new(api, NULL);
-    if (!context) {
+    w->context = pa_context_new(w->api, NULL);
+    if (!w->context) {
         log("pa_context_new fail");
         return false;
     }
 
-    pa_context_set_state_callback(context, context_state_callback, w);
-    log("exit paConnect");
+    pa_context_set_state_callback(w->context, context_state_callback, w);
     if (pa_context_connect(context, NULL, PA_CONTEXT_NOFAIL, NULL) < 0) {
-        if (pa_context_errno(context) == PA_ERR_INVALID) {
+        if(!w->retry) {
             log("Connection to PulseAudio failed. Automatic retry in 5s");
-            reconnect_timeout = 5;
-        }
-        else {
-            if(!retry) {
-                reconnect_timeout = -1;
-                pa_context_unref(context);
-                return false;
-            } else {
-                log("Connection failed, attempting reconnect");
-                reconnect_timeout = 5;
-                sleep(reconnect_timeout);
-
-                mInstance->paConnect(w);
-            }
+            sleep(5);
+            w->paConnect(w);
+            w->retry--;
+        } else {
+            log("unable connect to PulseAudio exit.");
+            pa_context_unref(context);
+            return false;
         }
     }
     return true;
@@ -311,7 +289,6 @@ bool AudioCore::paConnect(void *userdata) {
 void* AudioCore::main_loop(void *arg) {
     AudioCore *w = static_cast<AudioCore*>(arg);
     pthread_detach(pthread_self());
-
 
     w->m = pa_mainloop_new();
     if (!(w->m)) {
@@ -325,13 +302,10 @@ void* AudioCore::main_loop(void *arg) {
         goto out;
     }
 
-    if (mInstance->paConnect(w) == false) {
+    if (w->paConnect(w) == false) {
         log("connect_to_pulse fail:%s", strerror(errno));
         goto out;
     }
-
-    if (w->reconnect_timeout >= 0)
-        ;
 
     if (pa_mainloop_run(w->m, &(w->retval)) < 0) {
         log("pa_mainloop_run fail:%s", strerror(errno));
@@ -341,7 +315,6 @@ void* AudioCore::main_loop(void *arg) {
 out:
     if (w->m)
         pa_mainloop_free(w->m);
-    log("exit main_loop");
 
     return NULL;
 }
@@ -359,7 +332,6 @@ bool AudioCore::paStart() {
 
 bool AudioCore::paStop() {
 
-    mlog("paStop");
     if (context) {
         pa_context_disconnect(context);
         pa_mainloop_quit(m, retval);

@@ -1,4 +1,5 @@
 
+#include "audiocore.h"
 #include "audiomanager.h"
 
 
@@ -9,10 +10,10 @@ int main(int argc, char *argv[]) {
 
     AudioManager *am = new AudioManager();
 
-    ret = am->startPaService();
-    sleep(60);
+    ret |= am->startPaService();
+    sleep(100);
     am->print();
-    ret = am->stopPaService();
+    ret |= am->stopPaService();
     sleep(1);
     log("---test end---ret:%d", ret);
 

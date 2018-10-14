@@ -4,30 +4,28 @@
 #include "sinkinput.h"
 
 Sink::Sink() {
+
+}
+
+Sink::~Sink() {
+
 }
 
 void Sink::updateVolume(pa_volume_t v) {
-
     updateChannelVolume(0, v, true);
-
-    pa_operation* o;
+    pa_operation *o;
 
     if (!(o = pa_context_set_sink_volume_by_index(AudioCore::getInstance()->context, index, &volume, NULL, NULL))) {
         log("pa_context_set_sink_volume_by_index() failed");
         return;
     }
-
     pa_operation_unref(o);
 }
 
 void Sink::autoDefault(AudioCore *ac) {
-
-    std::string usb_name;
     std::string hdmi_name;
     std::string ana_name;
     std::string def_name;
-
-    uint32_t idx = 0;
 
     for (std::map<uint32_t, Sink*>::iterator i = ac->sinks.begin(); i != ac->sinks.end(); ++i) {
         Sink *w = i->second;
@@ -54,15 +52,15 @@ void Sink::autoDefault(AudioCore *ac) {
 
     mlog("[Sink]autoDefault:%s", def_name.c_str());
     updateDefault(def_name.c_str());
+
     //move sinkInput to default
     for (std::map<uint32_t, SinkInput*>::iterator it = ac->sinkInputs.begin(); it != ac->sinkInputs.end(); ++it)
         it->second->moveSinkInput(def_name.c_str());
 
 }
 
-
 void Sink::updateDefault(const char *name) {
-    pa_operation* o;
+    pa_operation *o;
 
     if (!(o = pa_context_set_default_sink(AudioCore::getInstance()->context, name, NULL, NULL))) {
         log("pa_context_set_default_sink() failed");

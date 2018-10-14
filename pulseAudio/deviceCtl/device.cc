@@ -2,16 +2,20 @@
 #include "audiocore.h"
 #include "device.h"
 
-/*** Device ***/
-Device::Device() {
+Device::Device()
+    : index(0),
+      card_index(0) {
 
 }
 
-void Device::updateChannelVolume(int channel, pa_volume_t v, bool isAll) {
-    pa_cvolume n;
-    //g_assert(channel < volume.channels);
+Device::~Device() {
 
-    n = volume;
+}
+
+//reserved interface
+void Device::updateChannelVolume(int channel, pa_volume_t v, bool isAll) {
+    pa_cvolume n = volume;
+
     if (isAll)
         pa_cvolume_set(&n, n.channels, v);
     else

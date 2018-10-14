@@ -7,6 +7,7 @@
 class Source : public Device {
 public:
     Source();
+    virtual ~Source();
 
     virtual void updateVolume(pa_volume_t v);
     virtual void updateDefault(const char *name);

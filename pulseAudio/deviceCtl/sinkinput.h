@@ -7,14 +7,11 @@
 class SinkInput {
 public:
     SinkInput();
+    virtual ~SinkInput();
+    virtual void moveSinkInput(const char *defName);
 
     std::string name;
     uint32_t index;
-    virtual void moveSinkInput(const char *defName);
-
-private:
-    uint32_t mSinkIndex;
-
 };
 
 #endif
