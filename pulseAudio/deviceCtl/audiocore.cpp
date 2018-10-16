@@ -15,6 +15,8 @@ AudioCore::AudioCore()
       m(NULL),
       retry(3),
       retval(0),
+      reconnect_running(false),
+      connected(false),
       defaultSinkIdx(0),
       defaultSourceIdx(0) {
 
@@ -116,7 +118,7 @@ void AudioCore::server_info_cb(pa_context *, const pa_server_info *i, void *user
 
 void AudioCore::subscribe_cb(pa_context *c, pa_subscription_event_type_t t, uint32_t index, void *userdata) {
     AudioCore *w = static_cast<AudioCore*>(userdata);
-    mlog("[linzr]enter:%s case:%#x", __FUNCTION__, t & PA_SUBSCRIPTION_EVENT_FACILITY_MASK);
+    mlog("[%s] case:%#x", __FUNCTION__, t & PA_SUBSCRIPTION_EVENT_FACILITY_MASK);
     switch (t & PA_SUBSCRIPTION_EVENT_FACILITY_MASK) {
         case PA_SUBSCRIPTION_EVENT_SINK:     //0x0000U
             if ((t & PA_SUBSCRIPTION_EVENT_TYPE_MASK) == PA_SUBSCRIPTION_EVENT_REMOVE)
@@ -196,6 +198,8 @@ void AudioCore::context_state_callback(pa_context *c, void *userdata) {
         case PA_CONTEXT_READY: {
             pa_operation *o;
 
+            w->connected = true;
+
             pa_context_set_subscribe_callback(c, subscribe_cb, w);
             if (!(o = pa_context_subscribe(c, (pa_subscription_mask_t)
                                            (PA_SUBSCRIPTION_MASK_SINK|
@@ -243,9 +247,8 @@ void AudioCore::context_state_callback(pa_context *c, void *userdata) {
         //the pulseaudio interrupt.
         case PA_CONTEXT_FAILED: {
             w->removeAll();
-            pa_context_unref(w->context);
-            w->context = NULL;
-            w->paConnect(w);
+            w->connected = false;
+            w->reconnect(w);
             break;
         }
 
@@ -259,7 +262,6 @@ void AudioCore::context_state_callback(pa_context *c, void *userdata) {
 
 bool AudioCore::paConnect(void *userdata) {
     AudioCore *w = static_cast<AudioCore*>(userdata);
-    log("enter paConnect w:%d instance:%d", w->retval, mInstance->retval);
 
     if (w->context)
         return false;
@@ -275,15 +277,47 @@ bool AudioCore::paConnect(void *userdata) {
         if(!w->retry) {
             log("Connection to PulseAudio failed. Automatic retry in 5s");
             sleep(5);
-            w->paConnect(w);
+            w->reconnect(w);
             w->retry--;
         } else {
             log("unable connect to PulseAudio exit.");
             pa_context_unref(context);
+            w->context = NULL;
             return false;
         }
     }
     return true;
+}
+
+void* AudioCore::do_reconnect(void *arg) {
+    AudioCore *w = static_cast<AudioCore*>(arg);
+    pthread_detach(pthread_self());
+    if (w->reconnect_running || w->connected) {
+        return NULL;
+    }
+
+    w->reconnect_running = true;
+    while (!w->connected) {
+        pa_context_unref(w->context);
+        w->context = NULL;
+        log("============= do_reconnect ============");
+        w->paConnect(w);
+        sleep(2);
+    }
+    w->reconnect_running = false;
+
+    return NULL;
+}
+
+void AudioCore::reconnect(void *userdata) {
+    pthread_t pid_t;
+
+    if (pthread_create(&pid_t, NULL, do_reconnect, userdata) != 0) {
+        log("pthread_create err:%s", strerror(errno));
+        return;
+    }
+
+    return;
 }
 
 void* AudioCore::main_loop(void *arg) {

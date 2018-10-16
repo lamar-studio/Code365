@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
     AudioManager *am = new AudioManager();
 
     ret |= am->startPaService();
-    sleep(100);
+    sleep(1000);
     am->print();
     ret |= am->stopPaService();
     sleep(1);

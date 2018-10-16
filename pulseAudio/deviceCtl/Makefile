@@ -1,8 +1,8 @@
 target=test
-$(target): test.cc audiomanager.cc audiomanager.h audiocore.cc audiocore.h \
-	sink.cc sink.h sinkinput.cc sinkinput.h source.cc source.h \
-	sourceoutput.cc sourceoutput.h device.cc device.h 
-	g++ -g test.cc audiomanager.cc audiocore.cc sink.cc sinkinput.cc source.cc sourceoutput.cc device.cc -o $(target) -Wall -lpthread -lpulse -std=c++11 
+$(target): test.cpp audiomanager.cpp audiomanager.h audiocore.cpp audiocore.h \
+	sink.cpp sink.h sinkinput.cpp sinkinput.h source.cpp source.h \
+	sourceoutput.cpp sourceoutput.h device.cpp device.h 
+	g++ -g test.cpp audiomanager.cpp audiocore.cpp sink.cpp sinkinput.cpp source.cpp sourceoutput.cpp device.cpp -o $(target) -Wall -lpthread -lpulse -std=c++11 
 run:$(target)
 	./test
 clean:

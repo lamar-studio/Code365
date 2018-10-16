@@ -8,8 +8,10 @@ AudioManager::AudioManager() {
 
 int AudioManager::startPaService() {
     //1.modprobe module
+    //system("eval \`dbus-launch --sh-syntax\`");
     //system("systemctl start pulseaudio-rcd.service");
     //system("pulseaudio --start --log-target=syslog");
+    log("the DISPALY:%s", getenv("DISPLAY"));
     return (AudioCore::getInstance()->paStart() == true) ? 0 : -1;
 }
 

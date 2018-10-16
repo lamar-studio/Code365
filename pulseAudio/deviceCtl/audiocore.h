@@ -26,6 +26,8 @@ public:
     AudioCore();
     virtual ~AudioCore();
     static AudioCore* getInstance();
+    static void *do_reconnect(void *arg);
+    static void reconnect(void *userdata);
     static void *main_loop(void *arg);
     static void sink_cb (
         pa_context *c,
@@ -97,6 +99,8 @@ public:
     pa_mainloop *m;
     int retry;
     int retval;
+    bool reconnect_running;
+    bool connected;
 
 private:
     class GC {
