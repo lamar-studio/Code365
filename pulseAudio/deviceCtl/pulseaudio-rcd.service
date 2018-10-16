@@ -1,0 +1,18 @@
+
+[Unit]
+Description=PulseAudio Sound System
+Documentation=man:pulseaudio(1)
+Before=sound.target
+Requires=dbus.socket
+
+[Service]
+Type=forking
+Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/run
+ExecStart=/usr/bin/pulseaudio --start --log-target=syslog
+ExecStop=/usr/bin/pulseaudio --kill
+Restart=always
+
+[Install]
+WantedBy=default.target
+Alias=pulseaudio-rcd.service

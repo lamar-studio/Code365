@@ -292,6 +292,7 @@ bool AudioCore::paConnect(void *userdata) {
 void* AudioCore::do_reconnect(void *arg) {
     AudioCore *w = static_cast<AudioCore*>(arg);
     pthread_detach(pthread_self());
+    log("enter reconnect");
     if (w->reconnect_running || w->connected) {
         return NULL;
     }
@@ -305,7 +306,7 @@ void* AudioCore::do_reconnect(void *arg) {
         sleep(2);
     }
     w->reconnect_running = false;
-
+    log("exit reconnect");
     return NULL;
 }
 
@@ -323,7 +324,22 @@ void AudioCore::reconnect(void *userdata) {
 void* AudioCore::main_loop(void *arg) {
     AudioCore *w = static_cast<AudioCore*>(arg);
     pthread_detach(pthread_self());
+#if 1
+    //load the snd module
+    if (system("modprobe snd_hda_intel") < 0) {
+        log("load snd_hda_intel err:%s", strerror(errno));
+        goto out;
+    }
 
+    //start the pulseaudio service
+    if (system("systemctl start pulseaudio-rcd.service") < 0) {
+        log("start pulseaudio err:%s", strerror(errno));
+        goto out;
+    }
+
+    sleep(2);    //wait the service stable.
+#endif
+    //connect
     w->m = pa_mainloop_new();
     if (!(w->m)) {
         log("pa_mainloop_new fail:%s", strerror(errno));
@@ -349,6 +365,8 @@ void* AudioCore::main_loop(void *arg) {
 out:
     if (w->m)
         pa_mainloop_free(w->m);
+    if (w->context)
+        pa_context_unref(w->context);
 
     return NULL;
 }
@@ -365,13 +383,27 @@ bool AudioCore::paStart() {
 }
 
 bool AudioCore::paStop() {
+    bool ret = true;
 
+    //disconnect
     if (context) {
         pa_context_disconnect(context);
         pa_mainloop_quit(m, retval);
     }
+#if 1
+    //stop the pulseaudio service
+    if (system("systemctl stop pulseaudio-rcd.service") < 0) {
+        log("stop pulseaudio err:%s", strerror(errno));
+        ret = false;
+    }
 
-    return true;
+    //unload the snd module
+    if (system("modprobe -r snd_hda_intel") < 0) {
+        log("unload snd_hda_intel err:%s", strerror(errno));
+        ret = false;
+    }
+#endif
+    return ret;
 }
 
 void AudioCore::updateSink(const pa_sink_info &info) {

@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <pulse/pulseaudio.h>
 
+#include "net_thread.h"
+
 #define DEBUG     (1)
 #define log(format, args...)  printf(format"\n", ##args)
 #define mlog(format, args...)                                 \
