@@ -50,7 +50,10 @@ void Source::autoDefault(AudioCore *ac) {
     }
 
     mlog("[Source]autoDefault:%s",def_name.c_str());
+    if (def_name == ac->defaultSourceName)
+        return;
     updateDefault(def_name.c_str());
+    ac->defaultSourceName = def_name;
 
     //move sourceOutput to default
     for (std::map<uint32_t, SourceOutput*>::iterator it = ac->sourceOutputs.begin(); it != ac->sourceOutputs.end(); ++it)

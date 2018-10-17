@@ -51,8 +51,11 @@ void Sink::autoDefault(AudioCore *ac) {
     }
 
     mlog("[Sink]autoDefault:%s", def_name.c_str());
-    updateDefault(def_name.c_str());
+    if (def_name == ac->defaultSinkName)
+        return;
 
+    updateDefault(def_name.c_str());
+    ac->defaultSinkName = def_name;
     //move sinkInput to default
     for (std::map<uint32_t, SinkInput*>::iterator it = ac->sinkInputs.begin(); it != ac->sinkInputs.end(); ++it)
         it->second->moveSinkInput(def_name.c_str());

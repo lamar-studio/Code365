@@ -103,6 +103,8 @@ public:
     int retval;
     bool reconnect_running;
     bool connected;
+    std::string defaultSinkName, defaultSourceName;
+    uint32_t defaultSinkIdx, defaultSourceIdx;
 
 private:
     class GC {
@@ -116,9 +118,6 @@ private:
     };
 
     static void init();
-
-    std::string defaultSinkName, defaultSourceName;
-    uint32_t defaultSinkIdx, defaultSourceIdx;
     static pthread_once_t mOnce;
     static AudioCore *mInstance;
     static GC mGc;

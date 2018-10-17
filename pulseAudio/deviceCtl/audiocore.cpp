@@ -100,7 +100,7 @@ void AudioCore::source_cb(pa_context *, const pa_source_info *i, int eol, void *
         return;
     }
 
-    if (i->monitor_of_sink != PA_INVALID_INDEX)
+    if ((i->monitor_of_sink != PA_INVALID_INDEX) || !(i->flags & PA_SOURCE_HARDWARE))
         return;
 
     w->updateSource(*i);
@@ -303,7 +303,7 @@ void* AudioCore::do_reconnect(void *arg) {
         w->context = NULL;
         log("============= do_reconnect ============");
         w->paConnect(w);
-        sleep(2);
+        sleep(5);
     }
     w->reconnect_running = false;
     log("exit reconnect");
@@ -324,7 +324,7 @@ void AudioCore::reconnect(void *userdata) {
 void* AudioCore::main_loop(void *arg) {
     AudioCore *w = static_cast<AudioCore*>(arg);
     pthread_detach(pthread_self());
-#if 1
+#if 0
     //load the snd module
     if (system("modprobe snd_hda_intel") < 0) {
         log("load snd_hda_intel err:%s", strerror(errno));
@@ -390,7 +390,7 @@ bool AudioCore::paStop() {
         pa_context_disconnect(context);
         pa_mainloop_quit(m, retval);
     }
-#if 1
+#if 0
     //stop the pulseaudio service
     if (system("systemctl stop pulseaudio-rcd.service") < 0) {
         log("stop pulseaudio err:%s", strerror(errno));
@@ -408,7 +408,7 @@ bool AudioCore::paStop() {
 
 void AudioCore::updateSink(const pa_sink_info &info) {
     Sink *w;
-    mlog("[%s]name:%s index:%d", __FUNCTION__, info.name, info.index);
+    mlog("[%s]desc:%s index:%d", __FUNCTION__, info.description, info.index);
 
     if (sinks.count(info.index))
         w = sinks[info.index];
@@ -428,7 +428,7 @@ void AudioCore::updateSink(const pa_sink_info &info) {
 
 void AudioCore::updateSource(const pa_source_info &info) {
     Source *w;
-    mlog("[%s]name:%s desc:%s", __FUNCTION__, info.name, info.description);
+    mlog("[%s]desc:%s index:%d", __FUNCTION__, info.description, info.index);
 
     if (sources.count(info.index))
         w = sources[info.index];
