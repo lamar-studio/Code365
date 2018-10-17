@@ -247,15 +247,19 @@ void AudioCore::context_state_callback(pa_context *c, void *userdata) {
         //the pulseaudio interrupt.
         case PA_CONTEXT_FAILED: {
             w->removeAll();
-            w->connected = false;
-            w->reconnect(w);
+            pa_context_unref(w->context);
+            w->context = NULL;
+            log("reconnect the pulseaudio");
+            w->paConnect(w);
             break;
         }
 
         case PA_CONTEXT_TERMINATED:
         default:
-            pa_context_unref(w->context);
-            w->context = NULL;
+            if(w->context) {
+                pa_context_unref(w->context);
+                w->context = NULL;
+            }
             return;
     }
 }
@@ -266,7 +270,14 @@ bool AudioCore::paConnect(void *userdata) {
     if (w->context)
         return false;
 
-    w->context = pa_context_new(w->api, NULL);
+    pa_proplist *proplist = pa_proplist_new();
+    pa_proplist_sets(proplist, PA_PROP_APPLICATION_NAME, "ruijie sound control");
+    pa_proplist_sets(proplist, PA_PROP_APPLICATION_ID, "ruijie.com.snd.ctl");
+    pa_proplist_sets(proplist, PA_PROP_APPLICATION_ICON_NAME, "audio-card");
+    pa_proplist_sets(proplist, PA_PROP_APPLICATION_VERSION, "V1.0");
+
+    w->context = pa_context_new_with_proplist(w->api, NULL, proplist);
+    pa_proplist_free(proplist);
     if (!w->context) {
         log("pa_context_new fail");
         return false;
@@ -303,7 +314,7 @@ void* AudioCore::do_reconnect(void *arg) {
         w->context = NULL;
         log("============= do_reconnect ============");
         w->paConnect(w);
-        sleep(5);
+        usleep(500000);
     }
     w->reconnect_running = false;
     log("exit reconnect");
@@ -324,7 +335,7 @@ void AudioCore::reconnect(void *userdata) {
 void* AudioCore::main_loop(void *arg) {
     AudioCore *w = static_cast<AudioCore*>(arg);
     pthread_detach(pthread_self());
-#if 0
+
     //load the snd module
     if (system("modprobe snd_hda_intel") < 0) {
         log("load snd_hda_intel err:%s", strerror(errno));
@@ -332,13 +343,12 @@ void* AudioCore::main_loop(void *arg) {
     }
 
     //start the pulseaudio service
-    if (system("systemctl start pulseaudio-rcd.service") < 0) {
+    if (system("pulse-daemon &") < 0) {
         log("start pulseaudio err:%s", strerror(errno));
         goto out;
     }
+    sleep(1);    //wait the service stable.
 
-    sleep(2);    //wait the service stable.
-#endif
     //connect
     w->m = pa_mainloop_new();
     if (!(w->m)) {
@@ -390,9 +400,13 @@ bool AudioCore::paStop() {
         pa_context_disconnect(context);
         pa_mainloop_quit(m, retval);
     }
-#if 0
+
     //stop the pulseaudio service
-    if (system("systemctl stop pulseaudio-rcd.service") < 0) {
+    if (system("pkill pulse-daemon") < 0) {
+        log("stop pulseaudio err:%s", strerror(errno));
+        ret = false;
+    }
+    if (system("pkill pulseaudio") < 0) {
         log("stop pulseaudio err:%s", strerror(errno));
         ret = false;
     }
@@ -402,7 +416,7 @@ bool AudioCore::paStop() {
         log("unload snd_hda_intel err:%s", strerror(errno));
         ret = false;
     }
-#endif
+
     return ret;
 }
 

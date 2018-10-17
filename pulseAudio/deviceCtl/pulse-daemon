@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# daemon the pulseaudio per 1s
+
+while true
+do
+  if ! /usr/bin/pulseaudio --check; then
+    /usr/bin/pulseaudio --start --log-target=syslog
+    echo `date` start pulseaudio>>/var/log/rcdev.log
+  fi
+  sleep 1
+done
+
+
+

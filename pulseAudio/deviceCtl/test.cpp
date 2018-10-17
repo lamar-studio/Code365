@@ -10,8 +10,10 @@ int main(int argc, char *argv[]) {
     AudioManager *am = new AudioManager();
 
     ret |= am->startPaService();
-    sleep(1000);
-    am->print();
+    while(1) {
+        am->print();
+        sleep(20);
+    }
     ret |= am->stopPaService();
     sleep(1);
     log("---test end---ret:%d", ret);
