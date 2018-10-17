@@ -7,7 +7,8 @@ Requires=dbus.socket
 
 [Service]
 Type=forking
-BusName=org.pulseaudio.Server
+Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/run
 ExecStart=/usr/bin/pulseaudio --start --log-target=syslog
 ExecStop=/usr/bin/pulseaudio --kill
 Restart=always
