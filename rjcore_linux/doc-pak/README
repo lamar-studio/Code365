@@ -1,0 +1,55 @@
+rainsys库：终端系统CBB组件库，包含终端系统的Linux CBB组件代码，独立打包成一个rainsys.deb包
+
+rainsys代码库组成结构：
+Makefile			        ==> 组件顶级Makefile
+Rules.mak			        ==> 组件Makefile公共编译规则
+env.mak			            ==> 组件Makefile公共变量定义
+main.mak			        ==> 顶级Makefile自定义区域，可添加模块和公共编译参数
+include/			        ==> 组件公共include目录，可在其中添加公共头文件
+  |- list.h
+sample/			            ==> 组件Makefile使用示例
+  |- Makefile		        ==> 模块分类Makefile
+  |- target.mak	            ==> 模块分类Makefile自定义区域，可添加模块和本类别共同的编译参数
+  |- libhello/		        ==> 动态库模块示例
+	  |- Makefile           ==> 模块Makefile
+	  |- local.mak	        ==> 模块Makefile自定义区域，定义模块编译文件列表和编译选项等
+	  |- libhello.c
+  |- hello/			        ==> 可执行模块示例
+	  |- Makefile
+	  |- local.mak
+	  |- hello.cpp
+  |- wave_player/           ==> 可执行模块示例
+	  |- Makefile
+	  |- local.mak
+	  |- alsa_player/       ==> 模块内子目录
+		  |- Makefile       ==> 子目录Makefile模板，定义子目录编译文件列表和编译选项
+		  |- alsa_player.c
+	  |- pa_player/
+		  |- Makefile
+		  |- pa_player.c
+	  |- wave_player.c
+scripts/			        ==> 编译和打包相关脚本
+  |- mkcdep
+  |- mkcppdep
+  |- build.sh		        ==> 编译脚本，最终输出打包好的组件deb包
+  |- version_update.sh      ==> 组件版本文件自动化修改脚本
+version
+  |- Makefile
+  |- local.mak
+  |- version_rainsys.ini    ==> 组件版本文件定义
+
+rainsys.deb的版本信息由 version/version_rainsys.ini 定义，该文件最终也会打包到deb包中
+本地编译的时候，可以使用version_update.sh脚本来更新版本信息，使得编译出来的deb包可以改成指定的版本号
+e.g.
+编译前执行：
+./scripts/version_update.sh 2.1.99 R0T1
+可以将rainsys.deb的版本号改成V2.1_R0T1.99
+然后执行：
+./scripts/build.sh
+即可编译rainsys库的所有模块并打包输出一个rainsys.deb，该deb包的版本号为：2.1.99-R0T1
+可以给build.sh脚本传递参数  QUIET=1  用于减少输出内容
+
+注意：本地编译修订版本号只是用于临时调试，在提交代码前应该先回退版本号的修订，避免污染版本信息文件
+提交代码前先执行：
+./scripts/version_update.sh revert
+可以回退版本号的变更

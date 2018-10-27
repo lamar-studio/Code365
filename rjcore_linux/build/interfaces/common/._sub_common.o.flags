@@ -1,0 +1,3 @@
+ifeq (-r common.o log.o,$(strip $(subst $(comma),:,$(EXTRA_LDFLAGS) $(obj-y))))
+FILES_FLAGS_UP_TO_DATE += /home/rcd/Code365/rjcore_linux/build/interfaces/common/_sub_common.o
+endif
