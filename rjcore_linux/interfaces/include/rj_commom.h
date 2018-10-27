@@ -28,4 +28,14 @@ extern bool g_isinit;
         }\
     }
 
+#define CHECK_FUNCTION_IN()                                           \
+    do {                                                              \
+        rjlog_info("== IN ==");                                       \
+    } while (0)
+
+#define CHECK_FUNCTION_OUT()                                           \
+        do {                                                           \
+            rjlog_info("== OUT ==");                                   \
+        } while (0)
+
 #endif /*__RJ_COMMON_H__*/

@@ -23,16 +23,18 @@ public class JNATest {
         String arg = "My name is control.";
         String str = Control.control(arg);
         System.out.println(str);
+        System.out.println("getBrightness");
+        Control.getBrightness();
         Product.product();
         Bt.bt();
         Application.application();
         Network.network();
-        
+
         try {
-            Thread.sleep(60000);
+            Thread.sleep(60);
         } catch (InterruptedException e) {
-            e.printStackTrace(); 
-        } 
+            e.printStackTrace();
+        }
         System.out.println("Test out!!!");
     }
 }

@@ -30,31 +30,37 @@ int application()
 
 int isProcessRunning(const char *processname)
 {
+    CHECK_FUNCTION_IN();
     return 0;
 }
 
 int installApk_block(const char *apkPath)
 {
+    CHECK_FUNCTION_IN();
     return 0;
 }
 
 int uninstallApk_block(const char *packageName)
 {
+    CHECK_FUNCTION_IN();
     return 0;
 }
 
 int installDeb_block(const char *debPath)
 {
+    CHECK_FUNCTION_IN();
     return 0;
 }
 
 int uninstallDeb_block(const char *debPath)
 {
+    CHECK_FUNCTION_IN();
     return 0;
 }
 
 int mergeDeltaPacket()
 {
+    CHECK_FUNCTION_IN();
     return 0;
 }
 

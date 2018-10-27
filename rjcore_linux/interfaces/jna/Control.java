@@ -13,4 +13,10 @@ public class Control {
          retbuf = null;
          return str;
      }
+
+    public static int getBrightness() {
+        int ret = RjCoreLib.INSTANCE.getBrightness();
+        return ret;
+    }
+
 }
