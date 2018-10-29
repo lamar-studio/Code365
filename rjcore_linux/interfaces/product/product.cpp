@@ -60,7 +60,20 @@ int getProductId(char *retbuf)
 int getSerialNumber(char *retbuf)
 {
     CHECK_FUNCTION_IN();
-    return 0;
+    char result[128] = {0};
+    char command[128] = {0};
+    int ret = 0;
+
+    sprintf(command, "dmidecode -t system | grep 'Serial Number'|cut -d : -f 2|sed s/[[:space:]]//g" );
+    rj_exec_result(command, result, sizeof(result));
+    if((strstr(result, "To be filled by O.E.M") != NULL) || (strstr(result, "empty") != NULL)) {
+        ret = -1;
+        goto end;
+    }
+    strncpy(retbuf, result, sizeof(result));
+
+end:
+    return ret;
 }
 
 int getMacAddress(char *retbuf)

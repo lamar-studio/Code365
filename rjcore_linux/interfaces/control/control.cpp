@@ -87,7 +87,7 @@ int getSupportResolution(char *retbuf)
     return 0;
 }
 
-int shutdownSelf()
+int shutDown()
 {
     CHECK_FUNCTION_IN();
     return 0;
