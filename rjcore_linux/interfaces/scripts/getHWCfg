@@ -1,0 +1,81 @@
+#!/bin/bash
+
+script_p=`realpath $(dirname $(which $0))`
+if [ -z "$script_p" ]; then
+    script_p=./
+fi
+
+fieldname=$1
+
+[ -f $script_p/function.bash ] && . $script_p/function.bash
+
+inifile=/etc/RainOScfg/hwcfg.ini
+hwcfginfo=
+
+if [ -f $inifile ]; then
+    hwcfginfo=`grep "^\s*{\s*ID\s*:\s*00000000\s*;" -r $inifile`
+else
+    kecho $inifile is not exist.
+fi
+
+if [ -z "$hwcfginfo" ]; then
+
+    dminame=`dmidecode -s system-product-name`
+    dmiid=`dmidecode -s baseboard-product-name | grep "^[0-9]*$"`
+    dmihwinfo=`dmidecode -t 11 | grep "String 1:" | sed s/"^\s*String 1:\s*"//`
+    dmihwinfo=`dmidecode -t 11 | grep "^\s*String 1:\s*{.*}\s*$" | sed s/"^\s*String 1:\s*{\s*"// | sed s/"\s*}\s*$"//`
+
+    if [ -z $dmihwinfo ]; then
+        kecho dmi hwinfo is not exist.
+
+        if [ -z "$dmiid" ]; then
+            kecho dmi id is not exist.
+        fi
+
+        if [ -f $inifile ]; then
+            hwcfginfo=`grep "^\s*{\s*ID\s*:\s*$dmiid\s*;" -r $inifile`
+        fi
+    else
+        hwcfginfo="{ID:$dmiid;NAME:$dminame;$dmihwinfo}"
+    fi
+fi
+
+kecho hwcfginfo=$hwcfginfo
+
+if [ -n "$fieldname" ]; then
+    if [ -n "$hwcfginfo" ]; then
+        kecho Search fieldname:$fieldname from hwcfginfo
+        OLDIFS="$IFS"
+        IFS=";"
+        hwcfginfo_array=(${hwcfginfo:1:-1})
+        for i in ${hwcfginfo_array[@]}
+        do
+            n=`echo $i | awk -F: '{print $1}' | xargs echo`
+            if [ "$n" = "$fieldname" ]; then
+                echo $i | awk -F: '{print $2}' | xargs echo
+                exit 0
+            fi
+        done
+    else
+        kecho Search fieldname:$fieldname from dmi
+        if [ "$fieldname" = "ID" ]; then
+            echo $dmiid
+            exit 0
+        elif [ "$fieldname" = "NAME" ]; then
+            echo $dminame
+            exit 0
+        fi
+    fi
+    kecho Can not find fieldname:$fieldname
+    exit 1
+fi
+
+if [ -n "$hwcfginfo" ]; then
+    echo $hwcfginfo
+    exit 0
+fi
+
+kecho Failed to get hwcfginfo
+
+exit 1
+

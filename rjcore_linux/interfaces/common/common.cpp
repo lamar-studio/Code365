@@ -14,13 +14,9 @@
 
 using namespace std;
 
-#define STRINGIZE(x) #x
-#define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
-
 //typedef int(*callback)(const char *eventName, int eventType, const char *eventContent);
 callback g_callback = NULL;
 bool g_isinit = false;
-static string g_platform;
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,19 +27,28 @@ int Init(const char *comName, callback cb)
     int ret = 0;
 
     g_callback = cb;
-   
-    /* log init */ 
+
+    /* log init */
     ret = rjlog_init(comName);
     if (ret != 0) {
-        return -1;
+        return ERROR_10001;
     }
+
+    /* product init */
+    ret = productInit();
+    if (ret != 0) {
+        return ERROR_10001;
+    }
+
+    /* network init */
+    network_init(cb);
 
     g_isinit = true;
     rjlog_info("rjcore_linux Version v%s init success.", STRINGIZE_VALUE_OF(VERSION));
-      
-    return 0;
+
+    return SUCCESS_0;
 }
- 
+
 #ifdef __cplusplus
 }
 #endif

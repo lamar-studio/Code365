@@ -1,3 +1,0 @@
-ifeq (-r rj_utils.o rj_log.o rj_error.o,$(strip $(subst $(comma),:,$(EXTRA_LDFLAGS) $(obj-y))))
-FILES_FLAGS_UP_TO_DATE += /home/rcd/Code365/rjcore_linux/build/interfaces/utils/_sub_utils.o
-endif

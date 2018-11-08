@@ -1,3 +1,0 @@
-ifeq (-Os -Wall -g -I/home/rcd/rjcore_linux/include -DIDV -DVDI -DVERSION=1.0.0 -I./inc -I../inc -I../../inc -I/home/rcd/rjcore_linux/include -std=c++11 -Wall -finline-functions -std=c++11 -Wall -finline-functions :,$(strip $(subst $(comma),:,$(CFLAGS) $(ADD_CFLAGS) $(ADD_CPPFLAGS) $(CFLAGS_./main.o))))
-FILES_FLAGS_UP_TO_DATE += /home/rcd/rjcore_linux/build/interfaces/bin/./main.o
-endif

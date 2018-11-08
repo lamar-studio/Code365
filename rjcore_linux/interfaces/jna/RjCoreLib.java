@@ -30,7 +30,7 @@ public interface RjCoreLib extends Library {
     public int setSleeptime(int time);
     public int getLedStatus(int color);
     public int setLedStatus(int color, int state);
-    public int getHostname(byte[] retbuf);
+    public int getHostname(byte[] retbuf, int size);
     public int setHostname(String hostname);
     public int setSystemTime(String time);
     public int setLanguage(String language);
@@ -39,26 +39,31 @@ public interface RjCoreLib extends Library {
 /* control end */
 
 /* product start */
-    public int product();
-    public int getProductType(byte[] retbuf);
-    public int getAbsLayerVersion(byte[] retbuf);
-    public int getSystemVersion(byte[] retbuf);
-    public int getHardwareVesion(byte[] retbuf);
-    public int getProductId(byte[] retbuf);
-    public int getSerialNumber(byte[] retbuf);
-    public int getMacAddress(byte[] retbuf);
-    public int getBiosInfo(byte[] retbuf);
-    public int getCpuInfo(byte[] retbuf);
-    public int getMemoryInfo(byte[] retbuf);
-    public int getBaseboardInfo(byte[] retbuf);
-    public int getSystemBit(byte[] retbuf);
-    public int getTermialType(byte[] retbuf);
-    public int collectLog(byte[] retbuf);
-    public int rmLogFile(byte[] path);
+    public int getProductType(byte[] type, int size);
+    public int getAbsLayerVersion(byte[] version, int size);
+    public int getSystemVersion(byte[] sysVer, int size);
+    public int getHardwareVesion(byte[] hardVer, int size);
+    public int getProductId(byte[] id, int size);
+    public int getSerialNumber(byte[] serial, int size);
+    public int getBiosInfo(byte[] bios, int size);
+    public int getCpuInfo(byte[] cpu, int size);
+    public int getMemoryInfo(byte[] mem, int size);
+    public int getBaseboardInfo(byte[] retbuf, int size);
+    public int getSystemBit(byte[] retbuf, int size);
+    public int getDiskInfo(String type, byte[] retbuf, int size);
+    public int getTermialType(byte[] retbuf, int size);
+    public int collectLog(String filename, byte[] retbuf, int size);
+    public int rmLogFile(String path);
 /* product end */
 
 /* bt start */
-    public int bt();
+    public void BT_MakeSeed_block(String request, byte[] respone);
+    public void BT_MakeSeed_cancel(String request, byte[] respone);
+    public void BT_Share_Start (String request, byte[] respone);
+    public void BT_Share_Stop (String request, byte[] respone);
+    public void BT_Download_block(String request, byte[] respone);
+    public void BT_Download_cancle(String request, byte[] respone);
+    public void BT_Get_Status (String request, byte[] respone);
 /* bt end */
 
 /* application start */
@@ -68,11 +73,21 @@ public interface RjCoreLib extends Library {
     public int uninstallApk_block(String packageName);
     public int installDeb_block(String debPath);
     public int uninstallDeb_block(String debPath);
-    public int mergeDeltaPacket();
+    public int mergeDeltaPacket_block(String old, String delta, String newpack);
 /* application end */
 
 /* network start */
     public int network();
+    public int getWiredMac(byte[] retbuf);
+    public int getNetStatus_block();
+    public int getIPInfo_block(byte[] retbuf);
+    public int checkPingIp_block(String ip, byte[] retbuf);
+    public int getCurCardSpeed(byte[] retbuf);
+    public int getMaxCardSpeed();
+    public int getOptionServerIp(int type, byte[] retbuf);
+    public int checkIpConflict_block(String ip, byte[] retbuf);
+    public int setDns_block(String info, byte[] retbuf);
+    public int setIP_block(String info, byte[] retbuf);
 /* network end */
 
 /* log start */

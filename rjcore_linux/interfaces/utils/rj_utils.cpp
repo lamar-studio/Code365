@@ -23,19 +23,20 @@
  */
 static FILE *rj_popen( const char* command, const char* mode ) {
 	FILE *fp = NULL;
-	if (NULL == command) {
+
+	if (command == NULL) {
 		rjlog_error("command is null");
 		return NULL;
 	}
-	if (NULL == mode) {
+	if (mode == NULL) {
 		rjlog_error("mode is not set");
 		return NULL;
 	}
 	errno = 0;
 	fp = popen(command, mode);
-	if (NULL == fp) {
+	if (fp == NULL) {
 		rjlog_error("popen failed");
-		if (0 != errno) {
+		if (errno != 0) {
             rjlog_error("errno:%d: %s", errno, strerror(errno));
 		}
 		return NULL;
@@ -49,13 +50,13 @@ static FILE *rj_popen( const char* command, const char* mode ) {
  */
 static int rj_pclose( FILE *fp ) {
 	int ret;
-	if (NULL == fp){
+	if (fp == NULL){
 		rjlog_error("invalid ptr");
 		return -1;
 	}
 	errno = 0;
 	ret = pclose(fp);
-	if (ret < 0){
+	if (ret < 0) {
         rjlog_error("errno:%d: %s", errno, strerror(errno));
 		return ret;
 	}
@@ -76,49 +77,10 @@ static int rj_pclose( FILE *fp ) {
             rjlog_error("popen command exit status:%d", ret);
         }
 	}
+
 	return ret;
 }
 
-/**
- * Function: rj_system_rw
- * Description: run system cmd with only read or write mode
- * Input: 	@command
- * 			@mode	"r" or "w"
- * In&Out:	@data	data input or output, NULL when none data
- * 			@size	the size of data to read or write
- * Return:	-1 	failed to run cmd
- * 			>=0 cmd return value
- */
-int rj_system_rw(const char *command, unsigned char *data, int *size, const char* mode) {
-	int readsize = 0, n;
-	FILE *fd;
-
-	if ((NULL != data) && (NULL != size)) {
-		readsize = *size;
-		*size = 0;
-	}
-
-	fd = rj_popen(command, mode);
-	if (NULL != fd) {
-		if (*mode == 'r') {
-			while ((readsize > 0) && ((n = fread(data, 1, readsize, fd)) > 0)) {
-				*size += n;
-				readsize -= n;
-				data += n;
-			}
-		} else {
-			while ((readsize > 0) && ((n = fwrite(data, 1, readsize, fd)) > 0)) {
-				*size += n;
-				readsize -= n;
-				data += n;
-			}
-		}
-		return rj_pclose(fd);
-	}
-	rjlog_error("rj_popen failed");
-
-	return -1;
-}
 
 /**
  * Function: rj_system
@@ -129,10 +91,12 @@ int rj_system_rw(const char *command, unsigned char *data, int *size, const char
  */
 int rj_system(const char *command) {
 	FILE *fd;
-	fd = rj_popen(command,"w");
-	if (NULL != fd) {
+
+	fd = rj_popen(command, "w");
+	if (fd != NULL) {
 		return rj_pclose(fd);
 	}
+
 	rjlog_error("rj_popen failed");
 	return -1;
 }
@@ -145,48 +109,51 @@ int rj_system(const char *command) {
  * 			size copy max size
  * 	Return: the size copied
  */
-int rj_strncp_line(char *dst, const char *src, int size) {
-	int cpsize = 0;
+size_t rj_strncp_line(char *dst, const char *src, size_t size) {
+	size_t cpsize = 0;
+
 	while (size-- > 0) {
-		if ((0 == *src) || (*src < 0x20) || (*src == '\n') || (*src == '\r')) {
+		if ((*src < 0x20) || (*src == '\n') || (*src == '\r')) {
             break;
         }
 		*dst++ = *src++;
 		cpsize++;
 	}
+
 	return cpsize;
 }
 
-
-int rj_exec_result(char *cmd, char *line_buf, int size)
-{
-    FILE *fp;
-    char *last_char;
-
-    fp = popen(cmd,"r");
-    if(fp == NULL)
-    {
-    	rjlog_error("cmd %s err(%s).\n", cmd, strerror(errno));
+int rj_exec_result(const char *cmd, char *result, size_t size) {
+    if (cmd == NULL || *cmd == '\0' || result == NULL) {
+        rjlog_error("the cmd is invalid");
         return -1;
     }
 
-    if (line_buf != NULL) {
-    	memset(line_buf, 0, size);
-    	if (fgets(line_buf, size-1, fp) == NULL) {
-    		goto end;
-    	}
-    	if (strlen(line_buf) > 0) {
-    		last_char = line_buf + strlen(line_buf) - 1;
-    		if (*last_char == '\n' || *last_char == '\r') {
-    			*last_char = '\0';
-    		}
-    	}
-    }
-end:
-	pclose(fp);
-	return 0;
-}
+    char *pBuf = result;
+    int len = 0;
+    int ret = 0;
+    FILE *ptr = NULL;
 
+    if ((ptr = rj_popen(cmd, "r")) != NULL) {
+        while (fgets(pBuf, size, ptr) != NULL) {
+            if ((len = strlen(pBuf)) == 0) {
+                rjlog_warn("the result is full");
+                break;
+            }
+
+            size -= len;
+            pBuf += len;
+        }
+
+        ret = rj_pclose(ptr);
+        ptr = NULL;
+    } else {
+        rjlog_error("open %s err:%s", cmd, strerror(errno));
+        return -1;
+    }
+
+    return ret;
+}
 
 int rj_exec(const char *cmd)
 {
@@ -212,6 +179,7 @@ uint64_t rj_get_file_size(const char *path)
     return filesize;
 }
 
+/*
 int rj_open_filelock(const char *lckname)
 {
     char lckpath[BUF_MAX] = {0};
@@ -253,4 +221,4 @@ int rj_filelock_unlock(int fd)
 {
     return flock(fd, LOCK_UN);
 }
-
+*/

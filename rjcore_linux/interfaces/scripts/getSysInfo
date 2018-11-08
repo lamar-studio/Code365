@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# README:
+# syssize unit(kB)  [1kB = 1000B]
+# datasize unit(kB) [1kB = 1000B]
+#
+hwcfg=/usr/local/bin/system/getHWCfg
+datapart=/opt/lessons
+
+if [ -e $hwcfg ];then
+  productid=`echo $(bash $hwcfg ID)`
+  productname=`echo $(bash $hwcfg NAME)`
+  platform=`echo $(bash $hwcfg PLAT)`
+else
+  productid=`echo $(dmidecode -s baseboard-product-name)`
+  productname=`echo $(dmidecode -s system-product-name)`
+fi  
+
+serialnum=`echo $(dmidecode -s system-serial-number)`
+hdversion=`echo $(dmidecode -s system-version)`
+biosversion=`echo $(dmidecode -s bios-version)`
+osversion=`echo $(cat /etc/issue)`
+bit=`echo $(getconf LONG_BIT)`
+cpu=`echo $(cat /proc/cpuinfo | grep "^model\s*name\s*:" | uniq | cut -d: -f2)`
+memory=`echo $(cat /proc/meminfo | grep "^MemTotal:" | cut -d: -f2)`
+
+sysblock=`echo $(df / | awk 'NR>1{print $1}' | sed -n -e 's/\/dev\///' -e 's/[0-9]*$// p')`
+[ -d $datapart ] && datablock=`echo $(df $datapart | awk 'NR>1{print $1}' | sed -n -e 's/\/dev\///' -e 's/[0-9]*$// p')`
+if [ "$sysblock" = "$datablock" ];then
+  [[ "$sysblock" =~ "mmcblk" ]] && sysblock=${sysblock%p}
+  datanum=`echo $(df $datapart | awk 'NR>1{print $1}' | sed -n -e 's/\/dev\/// p')`
+  if [ -f /sys/class/block/$sysblock/$datanum/size ];then 
+     datasize=`echo $(cat /sys/class/block/$sysblock/$datanum/size | awk '{print int($1*512/1000)}')kB`
+     syssize=`echo $(expr $(cat /sys/class/block/$sysblock/size) - $(cat /sys/class/block/$sysblock/$datanum/size) | awk '{print int($1*512/1000)}')kB`
+  fi
+else
+  [[ "$sysblock" =~ "mmcblk" ]] && sysblock=${sysblock%p}
+  [ -f /sys/class/block/$sysblock/size ] && syssize=`echo $(cat /sys/class/block/$sysblock/size | awk '{print int($1*512/1000)}')kB`
+  [[ "$datablock" =~ "bcache" ]] && datablock=`echo bcache0` 
+  [ -f /sys/class/block/$datablock/size ] && datasize=`echo $(cat /sys/class/block/$datablock/size | awk '{print int($1*512/1000)}')kB`
+fi
+
+[ ! -z "$serialnum" ] && echo serialnum=$serialnum
+[ ! -z "$productid" ] && echo productid=$productid
+[ ! -z "$productname" ] && echo productname=$productname
+[ ! -z "$platform" ] && echo platform=$platform
+[ ! -z "$hdversion" ] && echo hdversion=$hdversion
+[ ! -z "$biosversion" ] && echo biosversion=$biosversion
+[ ! -z "$osversion" ] && echo osversion=$osversion
+[ ! -z "$bit" ] && echo bit=$bit
+[ ! -z "$cpu" ] && echo cpu=$cpu
+[ ! -z "$memory" ] && echo memory=$memory
+[ ! -z "$storage" ] && echo storage=$storage
+[ ! -z "$datasize" ] && echo datasize=$datasize
+[ ! -z "$syssize" ] && echo syssize=$syssize
+exit 0

@@ -1,3 +1,0 @@
-ifeq (-r product.o,$(strip $(subst $(comma),:,$(EXTRA_LDFLAGS) $(obj-y))))
-FILES_FLAGS_UP_TO_DATE += /home/rcd/Code365/rjcore_linux/build/interfaces/product/_sub_product.o
-endif

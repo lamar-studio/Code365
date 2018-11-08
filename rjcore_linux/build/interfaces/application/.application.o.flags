@@ -1,3 +1,0 @@
-ifeq (-Os -Wall -g -I/home/rcd/Code365/rjcore_linux/include -DIDV -DVDI -DVERSION=1.0.0 -fPIC -shared -fstrict-aliasing -Wstrict-aliasing -I../include -fPIC -shared -fstrict-aliasing -Wstrict-aliasing -I../include -I/home/rcd/Code365/rjcore_linux/include -std=c++11 -ggdb -Wall -finline-functions -std=c++11 -ggdb -Wall -finline-functions,$(strip $(subst $(comma),:,$(CFLAGS) $(EXTRA_INCLUDE) $(EXTRA_CFLAGS) $(ADD_CFLAGS) $(ADD_CPPFLAGS) $(CFLAGS_application.o))))
-FILES_FLAGS_UP_TO_DATE += /home/rcd/Code365/rjcore_linux/build/interfaces/application/application.o
-endif

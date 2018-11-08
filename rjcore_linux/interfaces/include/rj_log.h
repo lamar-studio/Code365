@@ -37,7 +37,7 @@ enum LOG_LEVEL {
 #define _rj_dbg(debug, flag, fmt, ...) \
              do { \
                 if (debug & flag) \
-                    rj_log(fmt, ## __VA_ARGS__); \
+                    rjlog_debug(fmt, ## __VA_ARGS__); \
              } while (0)
 
 #define rj_dbg(flag, fmt, ...) _rj_dbg(rj_debug, flag, fmt, ## __VA_ARGS__)
@@ -56,7 +56,7 @@ enum LOG_LEVEL {
 
 #define rj_assert(cond) do {                                           \
     if (!(cond)) {                                                      \
-        rj_emerg("Assertion %s failed at %s %s:%d\n",                       \
+        rjlog_emerg("Assertion %s failed at %s %s:%d\n",                       \
                RJ_STRINGS(cond), __FUNCTION__, __LINE__);              \
         rj_abort();                                                    \
     }                                                                   \

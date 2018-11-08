@@ -44,6 +44,7 @@ JAR_LINK = sysrjcore_linux.jar
 JAR_OUTPUT = $(top_srcdir)/build/rcjar/$(JAR_FILE)
 JAR_LIB := $(LIBTOPDIR)/$(jnadir-y)/lib
 JAR_MF := $(LIBTOPDIR)/$(jnadir-y)/META-INF/MANIFEST.MF
+SCRIPT_PATH := $(LIBTOPDIR)/scripts
 #LIB_LINK = lib$(LIB_NAME).so
 
 override SUBDIRS := $(rootdir-y)
@@ -139,6 +140,7 @@ install:
 	cp -f $(LIB_OUTPUT) $(install_libdir)
 	cp -f $(JAR_OUTPUT) $(install_libdir)
 	cp -f $(JAR_LIB)/jna-5.0.0.jar $(install_libdir)
+	cp -f $(SCRIPT_PATH)/* /usr/local/bin/system 
 	rm -f $(install_libdir)/$(LIB_LINK)
 	rm -f $(install_libdir)/$(JAR_LINK)
 	cd $(install_libdir) && ln -s $(LIB_FILE) $(LIB_LINK) && ln -s $(JAR_FILE) $(JAR_LINK)

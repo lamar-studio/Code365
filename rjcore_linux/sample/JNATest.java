@@ -23,15 +23,20 @@ public class JNATest {
         String arg = "My name is control.";
         String str = Control.control(arg);
         System.out.println(str);
-        System.out.println("getBrightness");
-        Control.getBrightness();
-        Product.product();
-        Bt.bt();
+        System.out.println(Product.getProductType());
+        System.out.println(Product.getAbsLayerVersion());
+        System.out.println(Product.getSerialNumber());
+        System.out.println(Product.getDiskInfo("system"));
+        System.out.println(Product.getDiskInfo("data"));
+        System.out.println(Product.getTermialType());
+        System.out.println(Product.getProductId());
+        System.out.println(Product.getAbsLayerVersion());
+        System.out.println(Product.getSystemBit());
         Application.application();
         Network.network();
 
         try {
-            Thread.sleep(60);
+            Thread.sleep(60000);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
