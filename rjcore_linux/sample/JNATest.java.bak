@@ -1,0 +1,49 @@
+//package com.ruijie.core.linux;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import com.ruijie.rcos.linux.library.*;
+
+public class JNATest {
+    public static void main(String[] args) {
+        JNATest ts = new JNATest();
+
+        RjCallback rjcallback = new RjCallback(){
+            public int callback(String a, int b, String c) {
+                System.out.print(a);
+                System.out.print(" ");
+                System.out.print(b);
+                System.out.print(" ");
+                System.out.println(c);
+                return 0;
+            }
+        };
+
+        System.out.println("Test enter!!!");
+        Common.Init("shine", rjcallback);
+        String arg = "My name is control.";
+        System.out.println(Product.getProductType());
+        System.out.println(Product.getAbsLayerVersion());
+        System.out.println(Product.getSerialNumber());
+        System.out.println(Product.getDiskInfo("system"));
+        System.out.println(Product.getDiskInfo("data"));
+        //System.out.println(Product.collectLog_block("test"));
+        //System.out.println(Control.getSupportResolution());
+        //System.out.println(Control.getCurrentResolution());
+        //System.out.println(Control.getOptimumResolution());
+        //System.out.println(Control.getVoiceVolume());
+        //Control.setVoiceVolume(63);
+        //System.out.println(Control.getVoiceVolume());
+        System.out.println(Control.getPowerState());
+        Control.setPowerState(1);
+        System.out.println(Control.getPowerState());
+        Control.setPowerState(0);
+        System.out.println(Control.getPowerState());
+
+        try {
+            Thread.sleep(60000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        System.out.println("Test out!!!");
+    }
+}

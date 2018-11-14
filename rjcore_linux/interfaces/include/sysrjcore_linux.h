@@ -9,7 +9,6 @@ extern "C" {
 
 typedef int(*callback)(const char *eventName, int eventType, const char *eventContent);
 int Init(const char *comName, callback cb);
-int control(const char *arg, char *retbuf, int len);
 
 /* application */
 int isProcessRunning(const char *processname);
@@ -19,8 +18,30 @@ int uninstallDeb_block(const char *debPath);
 int mergeDeltaPacket_block(const char *old, const char *delta, const char *newpack);
 
 /* control */
-
-
+int controlInit();
+int getBrightness();
+int setBrightness(int brightness);
+int isSupportBrightness();
+int startPaService();
+int getVoiceVolume();
+int setVoiceVolume(int volume);
+int getHdmiVoiceStatus();
+int setHdmiVoiceStatus(int status);
+int setDeviceResolution(const char *res, int refresh);
+int getCurrentResolution(char *retbuf, size_t size);
+int getSupportResolution(char *retbuf, size_t size);
+int getOptimumResolution(char *retbuf, size_t size);
+int shutDown();
+int reboot();
+int setPowerState(int powerState);
+int getPowerState();
+int setSleeptime(int time);
+int getHostname(char *hostname, size_t size);
+int setHostname(const char *hostname);
+int syncServerTime(const char *serverip);
+int setLanguage(const char *language);
+int startConsole();
+int getUsbPathForOffine(char *retbuf, size_t size);
 
 /* product */
 int productInit();
@@ -39,6 +60,17 @@ int getDiskInfo(const char *type, char *retbuf, size_t size);
 int getTermialType(char *retbuf, size_t size);
 int collectLog_block(char *fileName, char *retbuf, size_t size);
 int rmLogFile(const char *path);
+
+/* sysmisc */
+int getPlatHWInfo(char *info, int len);
+int getDiskStatus_block();
+int getPersonalDiskList_block(char *list, int len);
+int formatPersonalDisk_block(const char *dev);
+int mountPersonalDisk_block(const char *dev,const char *dir, const char*option);
+int umountPersonalDisk_block(const char *dir);
+int checkISOVersion(const char *verstr);
+int fastUpgrade(const char*jsonmsg);
+int ipxeUpgrade(const char *verstr);
 
 #ifdef __cplusplus
 }

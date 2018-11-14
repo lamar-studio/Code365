@@ -40,11 +40,19 @@ int Init(const char *comName, callback cb)
         return ERROR_10001;
     }
 
+    ret = controlInit();
+    if (ret != 0) {
+        return ERROR_10001;
+    }
+
     /* network init */
     network_init(cb);
 
     g_isinit = true;
     rjlog_info("rjcore_linux Version v%s init success.", STRINGIZE_VALUE_OF(VERSION));
+
+    //start when finish the init.
+    startPaService();
 
     return SUCCESS_0;
 }

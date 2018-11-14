@@ -1,4 +1,4 @@
-#define MODULE_TAG    "application"
+#define MODULE_TAG    "bt"
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -44,11 +44,11 @@ int create_client_socket(char* buf_msg,int len,char* recv_buf)
 	if (buf_msg == NULL || len==0) {
 		return -2;
 	}
-	
+
 	if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
 		return -2;
     }
-	
+
     memset(&cliun, 0, sizeof(cliun));
     cliun.sun_family = AF_UNIX;
     strcpy(cliun.sun_path, BT_SERVER_PATH);
@@ -65,7 +65,7 @@ int create_client_socket(char* buf_msg,int len,char* recv_buf)
 	close(sockfd);
 
 	return 0;
-	
+
 }
 
 void bt_send_request(char* src,int msg_type,char* respone)

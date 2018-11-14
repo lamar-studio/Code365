@@ -16,17 +16,6 @@ using namespace std;
 extern "C" {
 #endif
 
-int application()
-{
-    CHECK_INIT_INT();
-    rjlog_info("functions enter.");
-
-    g_callback("application", 1, "app_callback");
-
-    rjlog_info("functions exit.");
-    return 0;
-}
-
 int isProcessRunning(const char *processname)
 {
     CHECK_INIT_INT();
@@ -49,12 +38,11 @@ int startProcess(const char *processname)
     CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
     CHECK_STR_PARA(processname);
-    int ret = 0;
     char cmd[128] = {0};
 
     snprintf(cmd, sizeof(cmd), "%s &", processname);
-    ret = rj_system(cmd);
-    if (ret < 0) {
+    rjlog_info("cmd:%s", processname);
+    if (rj_system(cmd) < 0) {
         rjlog_error("cmd:%s error", cmd);
         return ERROR_10000;
     }

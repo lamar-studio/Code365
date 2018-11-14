@@ -1,4 +1,4 @@
-package com.ruijie.core.linux.library;
+package com.ruijie.rcos.linux.library;
 
 import com.sun.jna.Library;
 import com.sun.jna.Native;
@@ -111,9 +111,9 @@ public class Product{
         return str;
     }
 
-    public static String collectLog(String fileName) {
+    public static String collectLog_block(String fileName) {
         byte[] retbuf = new byte[length];
-        RjCoreLib.INSTANCE.collectLog(fileName, retbuf, length);
+        RjCoreLib.INSTANCE.collectLog_block(fileName, retbuf, length);
         String str = new String(retbuf);
         retbuf = null;
         return str;

@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# README:
+# set the system language: english or chinese
+# 
+# Usage:
+# ./setLanguage chinese|english 
+
+envcfg=/etc/environment
+
+if [ -e $envcfg ];then
+  `sed -i '/LANG/d' $envcfg`
+  if [ "$1" = "chinese" ];then
+  `sed -i '$a LANG=\"zh_CN.utf8\"' $envcfg`
+  `export LANG=\"zh_CN.utf8\"`
+  exit 0
+  fi
+
+  if [ "$1" = "english" ];then
+  `sed -i '$a LANG=\"en_US.utf8\"' $envcfg`
+  `export LANG=\"en_US.utf8\"`
+  exit 0
+  fi
+fi  
+
+exit 1 

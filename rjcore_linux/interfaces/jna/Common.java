@@ -1,4 +1,4 @@
-package com.ruijie.core.linux.library;
+package com.ruijie.rcos.linux.library;
 
 import com.sun.jna.Library;
 import com.sun.jna.Native;

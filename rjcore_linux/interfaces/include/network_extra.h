@@ -13,6 +13,7 @@
 #include "rj_commom.h"
 #include "rj_ipc.h"
 #include "rj_thread.h"
+#include "rc_json.h"
 
 #define NET_EVENT_NAME "NetEvent"
 
@@ -48,10 +49,22 @@ enum WifiEventInfo {
     WIFI_EVENT_RESERVED          = 8
 };
 
+typedef struct ftp {
+    string serverIp;
+    int port;
+    string username;
+    string password;
+    string localFileName;
+    string remoteFileName;
+    int timeout;
+}ftpInfo;
 
 int  onEvent(void* data, size_t len, void *ctx);
 extern  void network_init(callback cb);
 extern void network_del();
+bool reconnect(RjClient*& client, bool attach);
+void restartNetworkDaemon();
+int parseFtpInfo(const string& cmd, ftpInfo& ftpinfo);
 
 //#ifdef __cplusplus
 //}

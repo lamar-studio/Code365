@@ -496,7 +496,6 @@ RjClient::RjClient(const char* name)
     }
 
     mConnected = true;
-    signal(SIGPIPE, SIG_IGN);
 }
 
 RjClient::~RjClient()
@@ -508,11 +507,9 @@ RjClient::~RjClient()
         close(mSockFd);
         unlink(socket_path.c_str());
         mSockFd = -1;
-        rjlog_info("unlink=====================");
         
     }
 
-    rjlog_info("niemingwang shi ge dashuaige =-=-=-=----------%s",socket_path.c_str());
 }
 
 
@@ -549,13 +546,13 @@ int RjClient::detach()
 {
     AutoMutex lock(mLock);
 
-    /*if (mThread) {
+    if (mThread) {
         mRunning = false;
         TEMP_FAILURE_RETRY(write(mExitSockets[0], "T", 1));
         mThread->stop();
         delete mThread;
         mThread = NULL;
-    }*/
+    }
     if (mSockFd >= 0) {
         close(mSockFd);
         unlink(socket_path.c_str());

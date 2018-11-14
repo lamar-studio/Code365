@@ -24,7 +24,7 @@ override ADD_CPPFLAGS += -std=c++11 -ggdb -Wall -finline-functions
 ADD_INCLUDE = ../include
 
 # specify link libs.
-ADD_LIB = -lpthread 
+ADD_LIB = -lpthread -lpulse 
 
 #
 # extra intstall target.
@@ -48,7 +48,7 @@ root-objs := $(SRC:%.c=%.o)
 # e.g.
 # rootdir-y := cli
 #
-rootdir-y := control product application common network bt utils 
+rootdir-y := control product application common network bt utils sysmisc
 
 # rootobj-y: the lingking targets of subdirs.
 # if subdir is xxx, then we add: $(_PDIR)/xxx/_sub_xxx.o
@@ -62,5 +62,6 @@ rootobj-y += $(_PDIR)/common/_sub_common.o
 rootobj-y += $(_PDIR)/network/_sub_network.o
 rootobj-y += $(_PDIR)/bt/_sub_bt.o
 rootobj-y += $(_PDIR)/utils/_sub_utils.o
+rootobj-y += $(_PDIR)/sysmisc/_sub_sysmisc.o
 
 jnadir-y += jna

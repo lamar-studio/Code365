@@ -1,7 +1,9 @@
 #define MODULE_TAG "network_extra"
 
 #include "network_extra.h"
+#include "rj_utils.h"
 using namespace std;
+using namespace RcJson;
 
 callback mCb;
 
@@ -66,7 +68,7 @@ int onEvent(void* data, size_t len, void *ctx)
                 eventType = TERMINATING;
                 pos += strlen("TERMINATING");
                 rjlog_info("mMonitor reconnect start");
-               // reconnect(mMonitor, true);
+                reconnect(mMonitor, true);
                 rjlog_info("reconnect end");
             } else {
                 rjlog_error("invalid event: %s", event.c_str());
@@ -92,6 +94,60 @@ int onEvent(void* data, size_t len, void *ctx)
             sleep(1);
         }
     }
+
+    return 0;
+}
+
+bool reconnect(RjClient*& client, bool attach)
+{
+    rjlog_info("reconnect client : %p, attach : %d", client, attach);
+    delete client;
+    sleep(2);
+    rjlog_info("reconnect start");
+    client = new RjClient(NET_EVENT_NAME);
+    if (!client->getConnected()) {
+        rjlog_error("cannot connect to service, try to restart it");
+        delete client;
+        restartNetworkDaemon();
+        client = new RjClient(NET_EVENT_NAME);
+    }
+
+    if (attach) {
+        client->attach(&onEvent, NULL);
+    }
+
+   rjlog_info("reconnect end");
+
+    return true;
+}
+
+void restartNetworkDaemon()
+{
+    char cmd[256];
+
+    sprintf(cmd, "pkill network_daemon");
+
+    rj_exec(cmd);
+
+    sprintf(cmd, "systemctl start network-daemon.service");
+
+    rj_exec(cmd);
+}
+
+int parseFtpInfo(const string& cmd, ftpInfo& ftpinfo)
+{
+    if (cmd.empty()) {
+        rjlog_info("ftpinfo json data is empty");
+        return -1;
+    }
+
+    ftpinfo.serverIp = rc_json_get_string(cmd,"serverIp");
+    ftpinfo.username = rc_json_get_string(cmd,"username");
+    ftpinfo.password = rc_json_get_string(cmd,"password");
+    ftpinfo.localFileName = rc_json_get_string(cmd,"localFileName");
+    ftpinfo.remoteFileName = rc_json_get_string(cmd,"remoteFileName");
+    ftpinfo.port = rc_json_get_int(cmd,"port");
+    ftpinfo.timeout = rc_json_get_int(cmd,"timeout");
 
     return 0;
 }

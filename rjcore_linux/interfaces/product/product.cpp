@@ -329,9 +329,10 @@ int collectLog_block(char *fileName, char *retbuf, size_t size)
     CHECK_STR_PARA(fileName);
     char cmd_buf[1024] = {0};
     char result[128] = {0};
+    int len = 0;
 
     sprintf(cmd_buf, "bash " RJ_SCRIPT_PATH "collet_log.sh %s ", fileName);
-    if (rj_exec_result(cmd_buf, result, sizeof(result) < 0)) {
+    if (rj_exec_result(cmd_buf, result, sizeof(result)) < 0) {
         rjlog_error("collectLog_block fail");
         return ERROR_10000;
     }
@@ -340,6 +341,10 @@ int collectLog_block(char *fileName, char *retbuf, size_t size)
         size = sizeof(result);
     }
 
+    len = strlen(result);
+    if (result[len - 1] == '\n') {
+        result[len - 1] = '\0';
+    }
     strncpy(retbuf, result, size);
 
     return 0;

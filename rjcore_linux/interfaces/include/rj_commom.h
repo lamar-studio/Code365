@@ -7,9 +7,11 @@
 #include "rj_log.h"
 #include "rj_utils.h"
 #include "rj_error.h"
+#include "rj_math.h"
 #include "sysrjcore_linux.h"
-#include "hw_config.h"
 #include "network_extra.h"
+#include "iniparser.h"
+#include "rj_thread.h"
 
 extern callback g_callback;
 extern bool g_isinit;
@@ -17,6 +19,10 @@ extern bool g_isinit;
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
 #define MAX_LEN_16 16
+#define RJ_IDV_TYPE            "IDV"
+#define RJ_VDI_TYPE            "VDI"
+#define RJ_LANG_CHINESE        "chinese"
+#define RJ_LANG_ENGLISH        "english"
 #define RJ_SCRIPT_PATH         "/usr/local/bin/system/"
 #define RJ_SYS_CONFIG_PATH     "/etc/RainOScfg/"
 #define RJ_USR_CONFIG_PATH     "/etc/UserCfg/"

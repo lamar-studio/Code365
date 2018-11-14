@@ -81,6 +81,75 @@ static int rj_pclose( FILE *fp ) {
 	return ret;
 }
 
+#define SYSTEM_CMDLINE_LENGTH   1024
+
+int rj_system_rw(const char *command, unsigned char *data, int *size, const char* mode) {
+        int readsize = 0, n;
+        FILE *fd;
+
+        if ((NULL != data) && (NULL != size)) {
+                readsize = *size;
+                *size = 0;
+        }
+
+        fd = rj_popen(command, mode);
+        if (NULL != fd) {
+                if (*mode == 'r') {
+                        while ((readsize > 0) && ((n = fread(data, 1, readsize, fd)) > 0)) {
+                                *size += n;
+                                readsize -= n;
+                                data += n;
+                        }
+                } else {
+                        while ((readsize > 0) && ((n = fwrite(data, 1, readsize, fd)) > 0)) {
+                                *size += n;
+                                readsize -= n;
+                                data += n;
+                        }
+                }
+                return rj_pclose(fd);
+        }
+        rjlog_error("rj_popen failed");
+
+        return -1;
+}
+
+int rj_system_r_args(char *rbuf, int rbuf_size, const char *fmt, ...)
+{
+    char cmd[SYSTEM_CMDLINE_LENGTH];
+    int cmdl = 0;
+    int ret = 0;
+    int rdsize = 0;
+    va_list args;
+    if ((NULL != rbuf) && (rbuf_size > 0))
+    {
+        *rbuf = '\0';
+        rdsize = rbuf_size;
+    }
+    va_start(args, fmt);
+    cmdl = vsnprintf(cmd, sizeof(cmd), fmt, args);
+    va_end(args);
+    if (cmdl >= SYSTEM_CMDLINE_LENGTH) {
+        rjlog_info("cmd string to long.");
+        return -1;
+    } else if (cmdl > 0) {
+        rjlog_info("run cmd:%s", cmd);
+        if (rdsize)
+        {
+            ret = rj_system_rw(cmd, (unsigned char *)rbuf, &rdsize, "r");
+            if (rdsize >= rbuf_size){
+                rdsize = rbuf_size - 1;
+            }
+            rbuf[rdsize] = '\0';
+            return ret;
+        }else {
+            return rj_system(cmd);
+        }
+    } else {
+        rjlog_info("cmd string invalue.");
+        return -1;
+    }
+}
 
 /**
  * Function: rj_system
@@ -99,6 +168,26 @@ int rj_system(const char *command) {
 
 	rjlog_error("rj_popen failed");
 	return -1;
+}
+
+int rj_system_args(const char *fmt, ...)
+{
+    char cmd[SYSTEM_CMDLINE_LENGTH];
+    int cmdl = 0;
+    va_list args;
+    va_start(args, fmt);
+    cmdl = vsnprintf(cmd, sizeof(cmd), fmt, args);
+    va_end(args);
+    if (cmdl >= SYSTEM_CMDLINE_LENGTH) {
+        rjlog_info("cmd string to long.");
+        return -1;
+    } else if (cmdl > 0) {
+        rjlog_info("run cmd:%s", cmd);
+        return rj_system(cmd);
+    } else {
+        rjlog_info("cmd string invalue.");
+        return -1;
+    }
 }
 
 /**
@@ -165,6 +254,50 @@ int rj_exec(const char *cmd)
     pclose(pp);
 
     return 0;
+}
+
+int dev_exec(const char *cmd, vector<string> &resvec)
+{
+
+    FILE *pp = popen(cmd, "r");
+
+    if (!pp) {
+        rjlog_error("popen failed");
+        return -1;
+    }
+
+    char tmp[1024];
+    resvec.clear();
+
+    while (fgets(tmp, sizeof(tmp), pp) != NULL) {
+        if (tmp[strlen(tmp) - 1] == '\n') {
+            tmp[strlen(tmp) - 1] = '\0';
+        }
+        resvec.push_back(tmp);
+    }
+
+    pclose(pp);
+
+    return resvec.size();
+}
+
+int check_ipaddr(const char *str)
+{
+    struct sockaddr_in6 addr6;
+    struct sockaddr_in addr4;
+
+    if (str == NULL || *str == '\0') {
+        rjlog_error("the str is invalid.");
+        return 1;
+    }
+
+    if (inet_pton(AF_INET, str, &addr4.sin_addr) == 1) {
+        return 0;
+    } else if (inet_pton(AF_INET6, str, &addr6.sin6_addr) == 1) {
+        return 0;
+    }
+
+    return 1;
 }
 
 uint64_t rj_get_file_size(const char *path)
