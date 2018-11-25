@@ -1,0 +1,1 @@
+cmd_/home/dsg208/study/gasm/kjmap/kjmap.ko := ld -r -m elf_x86_64 -T /usr/src/linux-headers-3.11.0-15-generic/scripts/module-common.lds --build-id  -o /home/dsg208/study/gasm/kjmap/kjmap.ko /home/dsg208/study/gasm/kjmap/kjmap.o /home/dsg208/study/gasm/kjmap/kjmap.mod.o

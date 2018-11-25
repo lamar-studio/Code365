@@ -1,0 +1,1 @@
+cmd_/home/dsg208/bios_nv/rw_bios_nv_km/rw_bios_nv.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /home/dsg208/bios_nv/rw_bios_nv_km/rw_bios_nv.ko /home/dsg208/bios_nv/rw_bios_nv_km/rw_bios_nv.o /home/dsg208/bios_nv/rw_bios_nv_km/rw_bios_nv.mod.o

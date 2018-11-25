@@ -1,0 +1,9 @@
+@LaMar@
+
+# build:
+1. gcc -o [binName] [fileName] -lasound
+
+# example:
+1. gcc -o record  record.c -lasound
+
+
