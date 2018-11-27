@@ -11,6 +11,9 @@
 
 #include "rj_commom.h"
 
+#define HDMI_PROFILE     "output:hdmi-stereo+input:analog-stereo"
+#define ANA_PROFILE      "output:analog-stereo+input:analog-stereo"
+
 class Sink;
 class Source;
 class SinkInput;
@@ -64,17 +67,15 @@ public:
         );
 
     static void get_sink_volume_callback (
-        pa_context *,
+        pa_context *c,
         const pa_sink_info *i,
-        int,
+        int eol,
         void *userdata
         );
 
-    bool paStart();
+    bool paStart(std::string type);
     bool paStop();
     bool paConnect(void *userdata);
-    int setSinkVolume(int vol);
-    int setSourceVolume(int vol);
 
     void updateSink(const pa_sink_info &info);
     void updateSource(const pa_source_info &info);
@@ -90,17 +91,21 @@ public:
     void printAll();
 
     void updateSinkVolume();
-    int setSinkVolume(pa_volume_t vol);
+    int setSinkVolume(int vol);
     int getSinkVolume();
+    int changeProfile(const char *profileName);
 
     std::map<uint32_t, Sink*, std::greater<uint32_t>> sinks;
     std::map<uint32_t, Source*, std::greater<uint32_t>> sources;
     std::map<uint32_t, SinkInput*, std::greater<uint32_t>> sinkInputs;
     std::map<uint32_t, SourceOutput*, std::greater<uint32_t>> sourceOutputs;
-    std::string defaultSinkName, defaultSourceName;
-    uint32_t defaultSinkIdx, defaultSourceIdx;
+    std::vector<std::string> profiles;
+    std::string defaultSinkName, defaultSourceName, innerCardName;
+    std::string hdmiProfile, anaProfile, termialType;
+    uint32_t defaultSinkIdx, defaultSourceIdx, innerCardIdx;
     pa_context *context;
     pa_cvolume sinkVol;
+    bool bHDMI;
 
 private:
     class GC {

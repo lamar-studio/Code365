@@ -15,12 +15,16 @@
 using namespace std;
 
 //typedef int(*callback)(const char *eventName, int eventType, const char *eventContent);
-callback g_callback = NULL;
-bool g_isinit = false;
+static callback g_callback = NULL;
+static bool g_isinit = false;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+bool isInit()
+{
+    return g_isinit;
+}
 
 int Init(const char *comName, callback cb)
 {
@@ -50,9 +54,6 @@ int Init(const char *comName, callback cb)
 
     g_isinit = true;
     rjlog_info("rjcore_linux Version v%s init success.", STRINGIZE_VALUE_OF(VERSION));
-
-    //start when finish the init.
-    startPaService();
 
     return SUCCESS_0;
 }

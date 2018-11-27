@@ -205,7 +205,7 @@ string VideoManager::getCurrentResolution()
             current = it->res;
         }
     }
-    rjlog_warn("the current:%s", current.c_str());
+    rjlog_info("the current:%s", current.c_str());
 
     return current;
 }

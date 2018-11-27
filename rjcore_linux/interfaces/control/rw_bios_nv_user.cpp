@@ -7,20 +7,26 @@
 #include "rj_commom.h"
 #include "rw_bios_nv_user.h"
 
-#define DEVICE_NAME "/dev/RW_BIOS_NV"
+#define DEVICE_NAME     "/dev/RW_BIOS_NV"
 
 void vdi_bios_nv_read_user(unsigned int nv_name, unsigned int *nv_value)
 {
     int fd;
     int cmd;
+    char buf[128] = {0};
     GET_VAR_STRUCTURE get_var_struct;
 
     get_var_struct.var_name = nv_name;
     get_var_struct.var_value = 0;
     get_var_struct.RetStatus = 0;
 
-    rj_system("insmod /usr/local/bin/rw_bios_nv.ko");
-    fd = open(DEVICE_NAME,O_RDWR);
+    rj_exec_result("lsmod | grep rw_bios_nv", buf, sizeof(buf));
+    if (buf[0] == '\0') {
+        rjlog_warn("insmod the rw_bios_nv.ko");
+        rj_system("insmod /usr/local/bin/rw_bios_nv.ko");
+    }
+
+    fd = open(DEVICE_NAME, O_RDWR);
     if (fd == -1) {
 		rjlog_error("open:%s error", DEVICE_NAME);
 		goto exit;
@@ -41,7 +47,6 @@ void vdi_bios_nv_read_user(unsigned int nv_name, unsigned int *nv_value)
 
 exit:
     close(fd);
-    rj_system("rmmod /usr/local/bin/rw_bios_nv.ko");
 
     return;
 }
@@ -50,12 +55,17 @@ void vdi_bios_nv_write_user(unsigned int nv_name, unsigned int nv_value)
 {
     int fd;
 	int cmd;
+    char buf[128] = {0};
 	SET_VAR_STRUCTURE set_var_struct;
 
 	set_var_struct.var_name = nv_name;
     set_var_struct.var_value = nv_value;
 
-    rj_system("insmod /usr/local/bin/rw_bios_nv.ko");
+    rj_exec_result("lsmod | grep rw_bios_nv", buf, sizeof(buf));
+    if (buf[0] == '\0') {
+        rjlog_warn("insmod the rw_bios_nv.ko");
+        rj_system("insmod /usr/local/bin/rw_bios_nv.ko");
+    }
     fd = open(DEVICE_NAME,O_RDWR);
     if (fd == -1) {
 		rjlog_error("open:%s error", DEVICE_NAME);
@@ -77,7 +87,6 @@ void vdi_bios_nv_write_user(unsigned int nv_name, unsigned int nv_value)
 
 exit:
     close(fd);
-	rj_system("rmmod /usr/local/bin/rw_bios_nv.ko");
 	return;
 }
 
@@ -85,11 +94,16 @@ void idv_bios_nv_read_user(unsigned int nv_name, unsigned int *nv_value)
 {
     int fd;
     int cmd;
+    char buf[128] = {0};
     BIOS_VAR_STRUCTURE get_var_struct;
 
     get_var_struct.var_name = nv_name;
 
-    rj_system("insmod /usr/local/bin/rw_bios_nv.ko");
+    rj_exec_result("lsmod | grep rw_bios_nv", buf, sizeof(buf));
+    if (buf[0] == '\0') {
+        rjlog_warn("insmod the rw_bios_nv.ko");
+        rj_system("insmod /usr/local/bin/rw_bios_nv.ko");
+    }
     fd = open(DEVICE_NAME, O_RDWR);
     if (fd == -1) {
         rjlog_error("open:%s fail", DEVICE_NAME);
@@ -120,7 +134,6 @@ void idv_bios_nv_read_user(unsigned int nv_name, unsigned int *nv_value)
 
 exit:
     close(fd);
-	rj_system("rmmod /usr/local/bin/rw_bios_nv.ko");
 }
 
 
@@ -128,11 +141,16 @@ void idv_bios_nv_write_user(unsigned int nv_name, unsigned int nv_value)
 {
     int fd;
 	int cmd;
+    char buf[128] = {0};
     BIOS_VAR_STRUCTURE set_var_struct;
 
     set_var_struct.var_name = nv_name;
 
-	rj_system("insmod /usr/local/bin/rw_bios_nv.ko");
+    rj_exec_result("lsmod | grep rw_bios_nv", buf, sizeof(buf));
+    if (buf[0] == '\0') {
+        rjlog_warn("insmod the rw_bios_nv.ko");
+        rj_system("insmod /usr/local/bin/rw_bios_nv.ko");
+    }
     fd = open(DEVICE_NAME,O_RDWR);
     if (fd == -1) {
         perror("open");
@@ -176,7 +194,6 @@ void idv_bios_nv_write_user(unsigned int nv_name, unsigned int nv_value)
 
 exit:
 	close(fd);
-	rj_system("rmmod /usr/local/bin/rw_bios_nv.ko");
 	return;
 }
 

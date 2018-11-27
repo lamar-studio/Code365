@@ -12,9 +12,9 @@ int Init(const char *comName, callback cb);
 
 /* application */
 int isProcessRunning(const char *processname);
-int startProcess(const char *processname);
-int installDeb_block(const char *debPath);
-int uninstallDeb_block(const char *debPath);
+int startProcess(const char *path, const char *processname);
+int installDeb_block(const char *debPath, const char *debName);
+int uninstallDeb_block(const char *debName);
 int mergeDeltaPacket_block(const char *old, const char *delta, const char *newpack);
 
 /* control */
@@ -22,7 +22,7 @@ int controlInit();
 int getBrightness();
 int setBrightness(int brightness);
 int isSupportBrightness();
-int startPaService();
+int startPaService(const char *type);
 int getVoiceVolume();
 int setVoiceVolume(int volume);
 int getHdmiVoiceStatus();
@@ -38,10 +38,13 @@ int getPowerState();
 int setSleeptime(int time);
 int getHostname(char *hostname, size_t size);
 int setHostname(const char *hostname);
-int syncServerTime(const char *serverip);
+int syncServerTime_block(const char *serverip);
 int setLanguage(const char *language);
 int startConsole();
 int getUsbPathForOffine(char *retbuf, size_t size);
+int mountUsb(const char *dev, char *retbuf, size_t size);
+int getUsbList(char *retbuf, size_t size);
+int unmountUsb(const char *path);
 
 /* product */
 int productInit();

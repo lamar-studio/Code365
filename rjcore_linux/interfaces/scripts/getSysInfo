@@ -19,7 +19,7 @@ fi
 serialnum=`echo $(dmidecode -s system-serial-number)`
 hdversion=`echo $(dmidecode -s system-version)`
 biosversion=`echo $(dmidecode -s bios-version)`
-osversion=`echo $(cat /etc/issue)`
+sysversion=`echo $(cat /etc/issue)`
 bit=`echo $(getconf LONG_BIT)`
 cpu=`echo $(cat /proc/cpuinfo | grep "^model\s*name\s*:" | uniq | cut -d: -f2)`
 memory=`echo $(cat /proc/meminfo | grep "^MemTotal:" | cut -d: -f2)`
@@ -46,7 +46,7 @@ fi
 [ ! -z "$platform" ] && echo platform=$platform
 [ ! -z "$hdversion" ] && echo hdversion=$hdversion
 [ ! -z "$biosversion" ] && echo biosversion=$biosversion
-[ ! -z "$osversion" ] && echo osversion=$osversion
+[ ! -z "$sysversion" ] && echo sysversion=$sysversion
 [ ! -z "$bit" ] && echo bit=$bit
 [ ! -z "$cpu" ] && echo cpu=$cpu
 [ ! -z "$memory" ] && echo memory=$memory

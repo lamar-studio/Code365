@@ -10,18 +10,18 @@ public class Application {
         return ret;
     }
 
-    public int startProcess(String processname) {
-        int ret = RjCoreLib.INSTANCE.startProcess(processname);
+    public static int startProcess(String path, String processname) {
+        int ret = RjCoreLib.INSTANCE.startProcess(path, processname);
         return ret;
     }
 
-    public static int installDeb_block(String debPath) {
-        int ret = RjCoreLib.INSTANCE.installDeb_block(debPath);
+    public static int installDeb_block(String debPath, String debName) {
+        int ret = RjCoreLib.INSTANCE.installDeb_block(debPath, debName);
         return ret;
     }
 
-    public static int uninstallDeb_block(String debPath) {
-        int ret = RjCoreLib.INSTANCE.uninstallDeb_block(debPath);
+    public static int uninstallDeb_block(String debName) {
+        int ret = RjCoreLib.INSTANCE.uninstallDeb_block(debName);
         return ret;
     }
 

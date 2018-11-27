@@ -60,10 +60,12 @@ public:
     void registerCallback(onDevEvent cb, onJsonEvent jcb, void* user);
     void doJsonCommand(int handle, const string& json);
 
-    int startPaService();
+    int startPaService(const char *type);
     int stopPaService();
     int setVolume(int volume);
     int getVolume();
+    int changeHDMI(const char *profilename);
+    int getHDMI();
 
 private:
     void doEvent(DevMsg& msg);

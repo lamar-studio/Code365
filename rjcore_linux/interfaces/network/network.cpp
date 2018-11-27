@@ -4,6 +4,7 @@
 #include <string>
 #include <iostream>
 #include <unistd.h>
+#include <sys/stat.h>
 #include "rj_commom.h"
 #include "rj_utils.h"
 
@@ -11,39 +12,27 @@ using namespace std;
 
 using std::string;
 
-int rj_execstring(const char *cmd, string &resevc)
-{
-    int num = 0;
-    resevc.clear();
-
-    FILE *pp = popen(cmd, "r");
-    if (!pp) {
-        return -1;
-    }
-
-    char tmp[1024];
-    while (fgets(tmp, sizeof(tmp), pp) != NULL) {
-        resevc.append(tmp);
-        num++;
-    }
-    pclose(pp);
-
-    return num;
-}
+#define DNS_MODE_CFG                 "/etc/resolv.conf"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-int network()
+/**return DHCP if dns is dhcp mode, STATIC if dns mode is static**/
+int getDnsMode(void)
 {
-    CHECK_INIT_INT();
-    rjlog_info("function enter.");
+    struct stat buf;
 
-    g_callback("network", 1, "network_callback");
+    if (lstat(DNS_MODE_CFG, &buf) == -1) {
+        rjlog_error("dns mode lstat error");
+        return ACQUIRE_FAIL;
+    }
 
-    rjlog_info("function exit.");
-    return 0;
+    if (S_ISLNK(buf.st_mode)) {
+        return DHCP;
+    }
+
+    return STATIC;
 }
 
 int getWiredMac(char *buf, size_t size)
@@ -51,7 +40,7 @@ int getWiredMac(char *buf, size_t size)
     CHECK_INIT_STR(buf, size);
     CHECK_FUNCTION_IN();
 
-    char cmd[128];
+    char cmd[command_size];
     string buf_str;
 
     sprintf(cmd, "/usr/local/bin/netmanager/network_cli -g wiredmac");
@@ -59,7 +48,7 @@ int getWiredMac(char *buf, size_t size)
     int num = rj_execstring(cmd, buf_str);
     if (num <= 0) {
         rjlog_error("getWiredMac excute failed");
-        return -1;
+        return COMMAND_FAIL;
     }
 
     if (buf_str.size() < size) {
@@ -67,7 +56,7 @@ int getWiredMac(char *buf, size_t size)
     }
 
     strncpy(buf, buf_str.c_str(), size);
-    return (buf_str.size());
+    return RIGHT_RESULT;
 }
 
 int getNetStatus_block(void)
@@ -75,7 +64,7 @@ int getNetStatus_block(void)
     CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
 
-    char cmd[128];
+    char cmd[command_size];
     string buf_str;
 
     sprintf(cmd, "/usr/local/bin/netmanager/network_cli -g netstatus");
@@ -83,11 +72,10 @@ int getNetStatus_block(void)
     int num = rj_execstring(cmd, buf_str);
     if (num <= 0) {
         rjlog_error("getNetStatus excute failed");
-        return -1;
+        return COMMAND_FAIL;
     }
 
     return atoi(buf_str.c_str());
-    //return (buf_str().size());
 }
 
 int getIPInfo_block(char *buf, size_t size)
@@ -95,7 +83,7 @@ int getIPInfo_block(char *buf, size_t size)
     CHECK_INIT_STR(buf, size);
     CHECK_FUNCTION_IN();
 
-    char cmd[128];
+    char cmd[command_size];
     string buf_str;
 
     sprintf(cmd, "/usr/local/bin/netmanager/network_cli -g ipinfo");
@@ -103,7 +91,7 @@ int getIPInfo_block(char *buf, size_t size)
     int num = rj_execstring(cmd, buf_str);
     if (num <= 0) {
         rjlog_error("getIPInfo excute failed");
-        return -1;
+        return COMMAND_FAIL;
     }
 
     if (buf_str.size() < size) {
@@ -111,8 +99,32 @@ int getIPInfo_block(char *buf, size_t size)
     }
 
     strncpy(buf, buf_str.c_str(), size);
-    return (buf_str.size());
+    return RIGHT_RESULT;
 
+}
+
+int getIPOnly(int type, char *buf, size_t size)
+{
+    CHECK_INIT_STR(buf, size);
+
+    char cmd[command_size];
+    string buf_str;
+    int ret = NOT_CARE;
+
+    if (type == NetworkWired) {
+        sprintf(cmd, "ifconfig -a | grep br0");
+        int num = rj_execstring(cmd, buf_str);
+        if (num <= 0) {
+            rjlog_info("have no br0");
+            ret = acquireIPOnly("eth0", buf, size);
+        } else {
+            ret = acquireIPOnly("br0", buf, size);
+        }
+    } else if (type == NetworkWireless) {
+        ret = acquireIPOnly("wlan0", buf, size);
+    }
+
+    return ret;
 }
 
 int checkPingIp_block(const char *ip, char *buf, size_t size)
@@ -120,7 +132,7 @@ int checkPingIp_block(const char *ip, char *buf, size_t size)
     CHECK_INIT_STR(buf, size);
     CHECK_STR_PARA(ip);
 
-    char cmd[128];
+    char cmd[command_size];
     string buf_str;
     string tmp_ip;
     tmp_ip.assign(ip);
@@ -130,7 +142,7 @@ int checkPingIp_block(const char *ip, char *buf, size_t size)
     int num = rj_execstring(cmd, buf_str);
     if (num <= 0) {
         rjlog_error("getPingInfo excute failed");
-        return -1;
+        return COMMAND_FAIL;
     }
 
     if (buf_str.size() < size) {
@@ -138,14 +150,14 @@ int checkPingIp_block(const char *ip, char *buf, size_t size)
     }
 
     strncpy(buf, buf_str.c_str(), size);
-    return (buf_str.size());
+    return RIGHT_RESULT;
 }
 
 int getCurCardSpeed(char* buf, size_t size)
 {
     CHECK_INIT_STR(buf, size);
 
-    char cmd[128];
+    char cmd[command_size];
     string buf_str;
 
     sprintf(cmd, "/usr/local/bin/netmanager/network_cli -g curspeed");
@@ -153,7 +165,7 @@ int getCurCardSpeed(char* buf, size_t size)
     int num = rj_execstring(cmd, buf_str);
     if (num <= 0) {
         rjlog_error("getcurspeed excute failed");
-        return -1;
+        return COMMAND_FAIL;
     }
 
     if (buf_str.size() < size) {
@@ -161,14 +173,14 @@ int getCurCardSpeed(char* buf, size_t size)
     }
 
     strncpy(buf, buf_str.c_str(), size);
-    return (buf_str.size());
+    return RIGHT_RESULT;
 }
 
 int getMaxCardSpeed()
 {
     CHECK_INIT_INT();
 
-    char cmd[128];
+    char cmd[command_size];
     string buf_str;
 
     sprintf(cmd, "/usr/local/bin/netmanager/network_cli -g speedmaxwired");
@@ -176,7 +188,7 @@ int getMaxCardSpeed()
     int num = rj_execstring(cmd, buf_str);
     if (num <= 0) {
         rjlog_error("get speedmaxwired excute failed");
-        return -1;
+        return COMMAND_FAIL;
     }
     return atoi(buf_str.c_str());
 }
@@ -185,7 +197,7 @@ int getOptionServerIp(int type, char* buf, size_t size)
 {
     CHECK_INIT_STR(buf, size);
 
-    char cmd[128];
+    char cmd[command_size];
     string buf_str;
 
     sprintf(cmd, "/usr/local/bin/netmanager/network_cli -g option43 -d %d", type);
@@ -193,7 +205,7 @@ int getOptionServerIp(int type, char* buf, size_t size)
     int num = rj_execstring(cmd, buf_str);
     if (num <= 0) {
         rjlog_error("get option43 excute failed");
-        return -1;
+        return COMMAND_FAIL;
     }
 
     if (buf_str.size() < size) {
@@ -201,7 +213,7 @@ int getOptionServerIp(int type, char* buf, size_t size)
     }
 
     strncpy(buf, buf_str.c_str(), size);
-    return (buf_str.size());
+    return RIGHT_RESULT;
 }
 
 int checkIpConflict_block(const char* ip_addr, char *buf, size_t size)
@@ -209,7 +221,7 @@ int checkIpConflict_block(const char* ip_addr, char *buf, size_t size)
     CHECK_INIT_STR(buf, size);
     CHECK_STR_PARA(ip_addr);
 
-    char cmd[128];
+    char cmd[command_size];
     string buf_str;
     string tmp_str;
 
@@ -221,7 +233,7 @@ int checkIpConflict_block(const char* ip_addr, char *buf, size_t size)
     int num = rj_execstring(cmd, buf_str);
     if (num <= 0) {
         rjlog_error("check ipconflict failed");
-        return -1;
+        return COMMAND_FAIL;
     }
 
     if (buf_str.size() < size) {
@@ -229,7 +241,7 @@ int checkIpConflict_block(const char* ip_addr, char *buf, size_t size)
     }
 
     strncpy(buf, buf_str.c_str(), size);
-    return (buf_str.size());
+    return RIGHT_RESULT;
 }
 
 int setDns_block(const char* info, char *buf, size_t size)
@@ -237,7 +249,7 @@ int setDns_block(const char* info, char *buf, size_t size)
     CHECK_INIT_STR(buf, size);
     CHECK_STR_PARA(info);
 
-    char cmd[128];
+    char cmd[command_size];
     string buf_str;
     string tmp_str;
 
@@ -246,17 +258,15 @@ int setDns_block(const char* info, char *buf, size_t size)
 
     if (tmp_str.length() < 0) {
         rjlog_error("inputting dns info is empty");
-        return -1;
+        return COMMAND_FAIL;
     }
-
-    rjlog_info("=================%s", tmp_str.c_str());
 
     sprintf(cmd, "/usr/local/bin/netmanager/network_cli -s dns -d '%s'", tmp_str.c_str());
 
     int num = rj_execstring(cmd, buf_str);
     if (num <= 0) {
         rjlog_error("set dns fail");
-        return -1;
+        return COMMAND_FAIL;
     }
 
     if (buf_str.size() < size) {
@@ -264,7 +274,7 @@ int setDns_block(const char* info, char *buf, size_t size)
     }
 
     strncpy(buf, buf_str.c_str(), size);
-    return (buf_str.size());
+    return RIGHT_RESULT;
 }
 
 int setIP_block(const char* info, char *buf, size_t size)
@@ -272,7 +282,7 @@ int setIP_block(const char* info, char *buf, size_t size)
     CHECK_INIT_STR(buf, size);
     CHECK_STR_PARA(info);
 
-    char cmd[128];
+    char cmd[command_size];
     string buf_str;
     string tmp_str;
 
@@ -281,25 +291,23 @@ int setIP_block(const char* info, char *buf, size_t size)
 
     if (tmp_str.length() < 0) {
         rjlog_error("inputting ip info is empty");
-        return -1;
+        snprintf((buf), size, "%s", ERROR_CODE.at(THREE_ORDER).c_str());
+        return INPUT_ERROR;
     }
-
-    rjlog_info("=================%s", tmp_str.c_str());
 
     sprintf(cmd, "/usr/local/bin/netmanager/network_cli -s ip -d '%s'", tmp_str.c_str());
 
     int num = rj_execstring(cmd, buf_str);
     if (num <= 0) {
         rjlog_error("set ip fail");
-        return -1;
+        return COMMAND_FAIL;
     }
-
     if (buf_str.size() < size) {
         size = buf_str.size();
     }
 
     strncpy(buf, buf_str.c_str(), size);
-    return (buf_str.size());
+    return RIGHT_RESULT;
 }
 
 int startFtpUpload_block(const char* uploadInfo)
@@ -314,7 +322,7 @@ int startFtpUpload_block(const char* uploadInfo)
     CHECK_INIT_INT();
     CHECK_STR_PARA(uploadInfo);
 
-    char cmd[256];
+    char cmd[command_size];
     ftpInfo info;
     string data;
     data.assign(uploadInfo);
@@ -322,7 +330,7 @@ int startFtpUpload_block(const char* uploadInfo)
     int ret = parseFtpInfo(data, info);
     if (ret < 0) {
         rjlog_error("parse ftp info failed");
-        return -1;
+        return JSON_FAIL;
     }
 
     if (info.username.empty() && info.password.empty()) {
@@ -335,12 +343,24 @@ int startFtpUpload_block(const char* uploadInfo)
     }
     rjlog_info("ftpupload cmd is %s", cmd);
 
+    //0 if curl upload finish in time, 28 if curl upload time out
     ret = rj_system(cmd);
-    if (ret < 0) {
+    if (ret != 0) {
+        if (ret == 28) {
+            string tmp_ping;
+            memset(cmd, 0, command_size);
+            sprintf(cmd, "ping -c 1 -W 1 -w 1 %s | grep '0 received'", info.serverIp.c_str());
+            int num = rj_execstring(cmd, tmp_ping);
+            if (num <= 0) {
+                rjlog_error("ftpupload ping successful");
+                return RIGHT_RESULT;
+            }
+        }
         rjlog_error("curl upload fail");
+        return COMMAND_FAIL;
     }
 
-    return 0;
+    return RIGHT_RESULT;
 
 }
 
@@ -356,7 +376,7 @@ int startFtpDownload_block(const char* downloadInfo, char* buf, size_t size)
     CHECK_INIT_STR(buf, size);
     CHECK_STR_PARA(downloadInfo);
 
-    char cmd[256];
+    char cmd[command_size];
     ftpInfo info;
     string data;
     data.assign(downloadInfo);
@@ -364,22 +384,36 @@ int startFtpDownload_block(const char* downloadInfo, char* buf, size_t size)
     int ret = parseFtpInfo(data, info);
     if (ret < 0) {
         rjlog_error("parse ftp info failed");
-        return -1;
+        snprintf((buf), size, "%s", ERROR_CODE.at(FOUR_ORDER).c_str());
+        return JSON_FAIL;
     }
 
     if (info.username.empty() && info.password.empty()) {
-        sprintf(cmd, "wget -O %s ftp://%s:%d/%s >/dev/null 2>&1 -T %d", info.localFileName.c_str()
-                  ,info.serverIp.c_str(), info.port, info.remoteFileName.c_str(), info.timeout);
+        sprintf(cmd, "curl -m %d -o %s ftp://%s:%d/%s >/dev/null 2>&1", info.timeout, info.localFileName.c_str()
+                  , info.serverIp.c_str(), info.port, info.remoteFileName.c_str());
     } else {
-        sprintf(cmd, "wget -O %s ftp://%s:%s@%s:%d/%s >/dev/null 2>&1 -T %d", info.localFileName.c_str()
+        sprintf(cmd, "curl -m %d -o %s ftp://%s:%s@%s:%d/%s >/dev/null 2>&1", info.timeout, info.localFileName.c_str()
                   , info.username.c_str(), info.password.c_str(), info.serverIp.c_str(), info.port
-                  , info.remoteFileName.c_str(), info.timeout);
+                  , info.remoteFileName.c_str());
     }
     rjlog_info("ftpupload cmd is %s", cmd);
 
     ret = rj_system(cmd);
-    if (ret < 0) {
-        rjlog_error("curl upload fail");
+    if (ret != 0) {
+        if (ret == 28) {
+            string tmp_ping;
+            memset(cmd, 0, command_size);
+            sprintf(cmd, "ping -c 1 -W 1 -w 1 %s | grep '0 received'", info.serverIp.c_str());
+            int num = rj_execstring(cmd, tmp_ping);
+            if (num <= 0) {
+                rjlog_error("ftpdownload ping successful");
+                return RIGHT_RESULT;
+            }
+        }
+
+        rjlog_error("curl download fail");
+        snprintf((buf), size, "%s", ERROR_CODE.at(SECOND_ORDER).c_str());
+        return COMMAND_FAIL;
     }
 
     if (access(info.localFileName.c_str(), F_OK) == 0) {
@@ -389,7 +423,8 @@ int startFtpDownload_block(const char* downloadInfo, char* buf, size_t size)
         ret = rj_execstring(cmd, res);
         if (ret < 0) {
             rjlog_error("compute downloading file size fail");
-            return -1;
+            snprintf((buf), size, "%s", ERROR_CODE.at(SECOND_ORDER).c_str());
+            return COMMAND_FAIL;
         }
 
         if (res.size() < size) {
@@ -399,8 +434,354 @@ int startFtpDownload_block(const char* downloadInfo, char* buf, size_t size)
         strncpy(buf, res.c_str(), size);
     }
 
-    return 0;
+    return RIGHT_RESULT;
 
+}
+
+/**
+ *wifi interface
+ */
+
+int getNetCardStatus(int card_type)
+{
+    CHECK_INIT_INT();
+
+    char cmd[command_size];
+    string buf_str;
+
+    if (card_type == NetworkWired) {
+        sprintf(cmd, "/usr/local/bin/netmanager/network_cli -g wiredcard");
+    } else if (card_type == NetworkWireless) {
+        sprintf(cmd, "/usr/local/bin/netmanager/network_cli -g wirelesscard");
+    }
+
+    int num = rj_execstring(cmd, buf_str);
+    if (num <= 0) {
+        rjlog_error("get card status excute failed");
+        return COMMAND_FAIL;
+    }
+
+    return (atoi(buf_str.c_str()));
+}
+
+int getWifiStatus_block(void)
+{
+    CHECK_INIT_INT();
+
+    char cmd[command_size];
+    string buf_str;
+
+    sprintf(cmd, "/usr/local/bin/netmanager/network_cli -a wifimanager -g wifistatus");
+
+    int num = rj_execstring(cmd, buf_str);
+    if (num <= 0) {
+        rjlog_error("get wifistatus excute failed");
+        return COMMAND_FAIL;
+    }
+
+    return atoi(buf_str.c_str());
+}
+
+int getWifiSavedList_block(char *buf, size_t size)
+{
+    CHECK_INIT_STR(buf, size);
+
+    char cmd[command_size];
+
+    string buf_str;
+
+    sprintf(cmd, "/usr/local/bin/netmanager/network_cli -a wifimanager -a wifisavelist");
+
+    int num = rj_execstring(cmd, buf_str);
+    if (num <= 0) {
+        rjlog_error("get wifisavedlist excute failed");
+        snprintf((buf), size, "%s", ERROR_CODE.at(SECOND_ORDER).c_str());
+        return COMMAND_FAIL;
+    }
+
+    if (buf_str.size() < size) {
+        size = buf_str.size();
+    }
+
+    strncpy(buf, buf_str.c_str(), size);
+    return RIGHT_RESULT;
+
+}
+
+int getScanResult_block(char *buf, size_t size)
+{
+    CHECK_INIT_STR(buf, size);
+
+    char cmd[command_size];
+
+    string buf_str;
+
+    sprintf(cmd, "/usr/local/bin/netmanager/network_cli -a wifimanager -g scanresults");
+
+    int num = rj_execstring(cmd, buf_str);
+    if (num <= 0) {
+        rjlog_error("get wifisavedlist excute failed");
+        snprintf((buf), size, "%s", ERROR_CODE.at(SECOND_ORDER).c_str());
+        return COMMAND_FAIL;
+    }
+
+    if (buf_str.size() < size) {
+        size = buf_str.size();
+    }
+
+    strncpy(buf, buf_str.c_str(), size);
+    return RIGHT_RESULT;
+}
+
+int getWifiInfo_block(char *buf, size_t size)
+{
+    CHECK_INIT_STR(buf, size);
+
+    char cmd[command_size];
+
+    string buf_str;
+
+    sprintf(cmd, "/usr/local/bin/netmanager/network_cli -a wifimanager -g wifiinfo");
+
+    int num = rj_execstring(cmd, buf_str);
+    if (num <= 0) {
+        rjlog_error("get wifiinfo excute failed");
+        snprintf((buf), size, "%s", ERROR_CODE.at(SECOND_ORDER).c_str());
+        return COMMAND_FAIL;
+    }
+
+    if (buf_str.size() < size) {
+        size = buf_str.size();
+    }
+
+    strncpy(buf, buf_str.c_str(), size);
+    return RIGHT_RESULT;
+}
+
+int getWhiteList_block(char *buf, size_t size)
+{
+    CHECK_INIT_STR(buf, size);
+
+    char cmd[command_size];
+
+    string buf_str;
+
+    sprintf(cmd, "/usr/local/bin/netmanager/network_cli -a wifimanager -g whitelist");
+
+    int num = rj_execstring(cmd, buf_str);
+    if (num <= 0) {
+        rjlog_error("get whitelist excute failed");
+        snprintf((buf), size, "%s", ERROR_CODE.at(SECOND_ORDER).c_str());
+        return COMMAND_FAIL;
+    }
+
+    if (buf_str.size() < size) {
+        size = buf_str.size();
+    }
+
+    strncpy(buf, buf_str.c_str(), size);
+    return RIGHT_RESULT;
+}
+
+
+int setNetCard(int card_type, bool disable)
+{
+    CHECK_INIT_INT();
+
+    char cmd[command_size];
+    string buf_str;
+    string tmp_str;
+
+    if (card_type == NetworkWired) {
+        sprintf(cmd, "/usr/local/bin/netmanager/network_cli -s wiredcardstatus -d %d", disable);
+    } else if (card_type == NetworkWireless) {
+        sprintf(cmd, "/usr/local/bin/netmanager/network_cli -a wifimanager -s wirelesscardstatus -d %d", disable);
+    }
+
+    int num = rj_execstring(cmd, buf_str);
+    if (num <= 0) {
+        rjlog_error("set card status fail");
+        return COMMAND_FAIL;
+    }
+
+    return RIGHT_RESULT;
+
+}
+
+int setForceScan_block(char *buf, size_t size)
+{
+    CHECK_INIT_STR(buf, size);
+    CHECK_FUNCTION_IN();
+
+    char cmd[command_size];
+    string buf_str;
+
+    sprintf(cmd, "/usr/local/bin/netmanager/network_cli -a wifimanager -s scan");
+
+    int num = rj_execstring(cmd, buf_str);
+    if (num <= 0) {
+        rjlog_error("force scan excute failed");
+        snprintf((buf), size, "%s", ERROR_CODE.at(SECOND_ORDER).c_str());
+        return COMMAND_FAIL;
+    }
+
+    if (buf_str.size() < size) {
+        size = buf_str.size();
+    }
+
+    strncpy(buf, buf_str.c_str(), size);
+    return RIGHT_RESULT;
+
+}
+
+int setConnectInfo_block(const char *info)
+{
+    CHECK_INIT_INT();
+    CHECK_STR_PARA(info);
+
+    char cmd[command_size];
+    string buf_str;
+    string tmp_str;
+
+    tmp_str.clear();
+    tmp_str.assign(info);
+
+    if (tmp_str.length() < 0) {
+        rjlog_error("inputting connect info is empty");
+        return INPUT_ERROR;
+    }
+
+    sprintf(cmd, "/usr/local/bin/netmanager/network_cli -a wifimanager -s connectinfo -d '%s'", tmp_str.c_str());
+
+    int num = rj_execstring(cmd, buf_str);
+    if (num <= 0) {
+        rjlog_error("connect a new wifi fail");
+        return COMMAND_FAIL;
+    }
+
+    return RIGHT_RESULT;
+
+}
+
+int setConnectId_block(int net_id)
+{
+    CHECK_INIT_INT();
+
+    char cmd[command_size];
+    string buf_str;
+
+    sprintf(cmd, "/usr/local/bin/netmanager/network_cli -a wifimanager -s connectid -d %d", net_id);
+
+    int num = rj_execstring(cmd, buf_str);
+    if (num <= 0) {
+        rjlog_error("connect a saved wifi fail");
+        return COMMAND_FAIL;
+    }
+
+    return RIGHT_RESULT;
+
+}
+
+int setForgetId_block(int net_id)
+{
+    CHECK_INIT_INT();
+
+    char cmd[command_size];
+    string buf_str;
+
+    sprintf(cmd, "/usr/local/bin/netmanager/network_cli -a wifimanager -s forget -d %d", net_id);
+
+    int num = rj_execstring(cmd, buf_str);
+    if (num <= 0) {
+        rjlog_error("forget a saved wifi fail");
+        return COMMAND_FAIL;
+    }
+
+    return RIGHT_RESULT;
+}
+
+int setDisconnect_block(void)
+{
+    CHECK_INIT_INT();
+
+    char cmd[command_size];
+    string buf_str;
+
+    sprintf(cmd, "/usr/local/bin/netmanager/network_cli -a wifimanager -s disconnect");
+
+    int num = rj_execstring(cmd, buf_str);
+    if (num <= 0) {
+        rjlog_error("forget a saved wifi fail");
+        return COMMAND_FAIL;
+    }
+
+    return RIGHT_RESULT;
+}
+
+int setWhiteList_block(const char *info)
+{
+    CHECK_INIT_INT();
+    CHECK_STR_PARA(info);
+
+    char cmd[command_size];
+    string buf_str;
+    string tmp_str;
+
+    tmp_str.clear();
+    tmp_str.assign(info);
+
+    if (tmp_str.length() < 0) {
+        rjlog_error("inputting whitelist info is empty");
+        return INPUT_ERROR;
+    }
+
+    sprintf(cmd, "/usr/local/bin/netmanager/network_cli -a wifimanager -s whitelist -d '%s'", tmp_str.c_str());
+
+    int num = rj_execstring(cmd, buf_str);
+    if (num <= 0) {
+        rjlog_error("connect a new wifi fail");
+        return COMMAND_FAIL;
+    }
+
+    return RIGHT_RESULT;
+
+}
+
+int checkWifiTerminal_block(void)
+{
+    CHECK_INIT_INT();
+
+    char cmd[command_size];
+    string buf_str;
+
+    sprintf(cmd, "/usr/local/bin/netmanager/network_cli -c wifiterminal");
+
+    int num = rj_execstring(cmd, buf_str);
+    if (num <= 0) {
+        rjlog_error("check ipconflict failed");
+        return COMMAND_FAIL;
+    }
+
+    return atoi(buf_str.c_str());
+}
+
+int checkWifiSaved_block(const char* info)
+{
+    CHECK_INIT_INT();
+    CHECK_STR_PARA(info);
+
+    char cmd[command_size];
+    string buf_str;
+
+    sprintf(cmd, "/usr/local/bin/netmanager/network_cli -a wifimanager -c wifisaved -d '%s'", info);
+
+    int num = rj_execstring(cmd, buf_str);
+    if (num <= 0) {
+        rjlog_error("check ipconflict failed");
+        return COMMAND_FAIL;
+    }
+
+    return atoi(buf_str.c_str());
 }
 
 #ifdef __cplusplus

@@ -110,8 +110,8 @@ public class Control {
     }
 
 
-    public static int syncServerTime(String serverip) {
-        int ret = RjCoreLib.INSTANCE.syncServerTime(serverip);
+    public static int syncServerTime_block(String serverip) {
+        int ret = RjCoreLib.INSTANCE.syncServerTime_block(serverip);
         return ret;
     }
 

@@ -37,9 +37,12 @@ void Source::autoDefault(AudioCore *ac) {
             def_name = w->name;
             break;
         } else if (strstr(w->prio_type.c_str(), "HDMI") != NULL || strstr(w->prio_type.c_str(), "hdmi") != NULL) {
+            // hdmi nonsupport the source channel
+            /*
             if (hdmi_name.empty()) {
                 hdmi_name = w->name;
             }
+            */
             continue;
         } else {
             if (ana_name.empty()) {
@@ -53,7 +56,12 @@ void Source::autoDefault(AudioCore *ac) {
         def_name = hdmi_name.empty() ? ana_name : hdmi_name;
     }
 
-    rjlog_info("[Source]:%s",def_name.c_str());
+    if (def_name.empty()) {
+        rjlog_warn("the default device is empty");
+        return;
+    }
+
+    rjlog_info("[Source]:%s", def_name.c_str());
     if (def_name == ac->defaultSourceName) {
         rjlog_info("the same as the defaultSourceName");
         return;

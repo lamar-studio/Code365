@@ -19,15 +19,14 @@ using namespace std;
 extern "C" {
 #endif
 
-#define BRIGHTNESS_PATH	    "/sys/class/backlight/intel_backlight/"
+#define BRIGHTNESS_PATH        "/sys/class/backlight/intel_backlight/"
 
-dictionary *ini;
 static int bn_min, bn_max;
 static rcdev::AudioManager am;
 static rcdev::VideoManager vm;
 static Mutex g_cfg_lock;
 
-static int rj_set_conf(char *key, char *val)
+static int rj_set_int_conf(char *key, int val)
 {
     int ret = 0;
     dictionary *ini = NULL;
@@ -36,23 +35,29 @@ static int rj_set_conf(char *key, char *val)
     AutoMutex Autolock(g_cfg_lock);
     ini = iniparser_load(RJ_USR_CONFIG_PATH "system.ini");
     if (ini == NULL) {
-    	rjlog_error("iniparser_load fail");
+        rjlog_error("iniparser_load fail");
         ret = -1;
         goto out;
     }
 
     fp = fopen(RJ_USR_CONFIG_PATH "system.ini", "w+");
     if (fp == NULL) {
-    	rjlog_error("open system.ini fail");
+        rjlog_error("open system.ini fail");
         ret =  -1;
         goto out;
     }
-    ret = iniparser_set(ini, key, val);
-    iniparser_dump_ini(ini, fp);          //save
+    ret = iniparser_set_int(ini, key, val);
+    if (ret < 0) {
+        rjlog_error("iniparser_set_int fail");
+        goto out;
+    }
+
+    iniparser_dump_ini(ini, fp);              //save
 
 out:
     if (fp) {
         fflush(fp);
+        fsync(fileno(fp));
         fclose(fp);
         fp = NULL;
     }
@@ -65,19 +70,20 @@ out:
     return ret;
 }
 
-static char* rj_get_conf(const char *key, char *def)
+static int rj_get_int_conf(const char *key, int notfound)
 {
-    char *val = NULL;
+    int val;
     dictionary *ini = NULL;
 
     AutoMutex Autolock(g_cfg_lock);
+    CHECK_FUNCTION_IN();
     ini = iniparser_load(RJ_USR_CONFIG_PATH "system.ini");
     if (ini == NULL) {
         rjlog_error("iniparser_load fail");
-        return def;
+        return notfound;
     }
 
-    val = iniparser_getstring(ini, key, def);
+    val = iniparser_getint(ini, key, notfound);
 
     if (ini) {
         iniparser_freedict(ini);
@@ -90,18 +96,33 @@ static char* rj_get_conf(const char *key, char *def)
 static int is_support_brightness()
 {
     if (access(BRIGHTNESS_PATH "brightness", F_OK) != 0) {
-    	rjlog_warn("this terminal nonsupport brightness.");
+        rjlog_warn("this terminal nonsupport brightness.");
         return 0;
     } else {
-    	rjlog_info("this terminal support brightness.");
+        rjlog_info("this terminal support brightness.");
         return 1;
+    }
+}
+
+static bool is_hdmi_connected()
+{
+    char res[SIZE_64] = {0};
+
+    rj_exec_result("cat `find /sys/class/drm/ | grep HDMI | sed 's/$/\\/status/g'` | grep \"^connected\"",
+                   res, sizeof(res));
+    if (res[0] == '\0') {
+        rjlog_info("HDMI device disconnected.");
+        return false;
+    } else {
+        rjlog_info("HDMI device connected.");
+        return true;
     }
 }
 
 static int brightness_map()
 {
     int len = 0;
-    char res[64] = {0};
+    char res[SIZE_64] = {0};
 
     rj_exec_result("cat " BRIGHTNESS_PATH "max_brightness", res, sizeof(res));
     if (res[0] == '\0') {
@@ -135,15 +156,10 @@ int getBrightness()
 {
     CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
-    char *val = NULL;
     int brightness = 0;
 
     if (is_support_brightness()) {
-        val = rj_get_conf("control:brightness", (char *)"50");
-        brightness = atoi(val);
-        rjlog_debug("ini:%d", brightness);
-    } else {
-        rjlog_warn("this terminal nonsupport brightness.");
+        brightness = rj_get_int_conf("control:brightness", 81);   // 81 - the default val.
     }
 
     return brightness;
@@ -153,8 +169,7 @@ int setBrightness(int brightness)
 {
     CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
-    char cmd[64] = {0};
-    char val[64] = {0};
+    char cmd[SIZE_64] = {0};
     int actual = 0;
 
     if (brightness < 0 || brightness > 100) {
@@ -173,16 +188,13 @@ int setBrightness(int brightness)
         }
 
         // save the brightness to ini.
-        snprintf(val, sizeof(val), "%d", brightness);
-        if (rj_set_conf((char *)"control:brightness", val) < 0) {
+        if (rj_set_int_conf((char *)"control:brightness", brightness) < 0) {
             rjlog_error("rj_set_conf error");
             return ERROR_10000;
         }
-    } else {
-        rjlog_warn("this terminal nonsupport brightness.");
     }
 
-    return 0;
+    return SUCCESS_0;
 }
 
 int isSupportBrightness()
@@ -193,12 +205,15 @@ int isSupportBrightness()
     return is_support_brightness();
 }
 
-int startPaService()
+int startPaService(const char *type)
 {
-    CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
 
-    int ret = am.startPaService();
+    int ret = am.startPaService(type);
+    if (ret < 0) {
+        rjlog_error("connect pulse fail");
+        return ERROR_10000;
+    }
 
     return ret;
 }
@@ -207,31 +222,70 @@ int getVoiceVolume()
 {
     CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
+
+#if 0
     int vol = am.getVolume();
-    return vol;
+    if (vol < 0) {
+        rjlog_error("get volume fail");
+        return ERROR_10000;
+    }
+#endif
+    return SUCCESS_0;
 }
 
 int setVoiceVolume(int volume)
 {
     CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
-    int ret = am.setVolume(volume);
+#if 0
+    if (volume < 0 || volume > 100) {
+        rjlog_error("param error: 0 <= volume <= 100");
+        return ERROR_10000;
+    }
 
-    return ret;
+    int ret = am.setVolume(volume);
+    if (ret < 0) {
+        rjlog_error("set volume fail");
+        return ERROR_10000;
+    }
+#endif
+    return SUCCESS_0;
 }
 
 int getHdmiVoiceStatus()
 {
     CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
-    return 0;
+
+    int ret = rj_get_int_conf("control:hdmi", 0);
+    rjlog_debug("control:hdmi val:%d ", ret);
+
+    return ret;
 }
 
 int setHdmiVoiceStatus(int status)
 {
     CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
-    return 0;
+
+    if (!is_hdmi_connected()) {
+        return ERROR_11001;
+    }
+
+    bool bHDMI = status;
+
+    int ret = am.changeHDMI(bHDMI ? "hdmi" : "analog");
+    if (ret < 0) {
+        rjlog_error("changeHDMI fail");
+        return ERROR_10000;
+    }
+
+    if (rj_set_int_conf((char *)"control:hdmi", bHDMI) < 0) {
+        rjlog_error("rj_set_conf:hdmi error");
+        return ERROR_10000;
+    }
+
+    return SUCCESS_0;
 }
 
 int getCurrentResolution(char *retbuf, size_t size)
@@ -240,20 +294,25 @@ int getCurrentResolution(char *retbuf, size_t size)
     CHECK_FUNCTION_IN();
     string cur = vm.getCurrentResolution();
 
-    if (size > cur.size()) {
-        size = cur.size();
+    if (cur.empty()) {
+        snprintf(retbuf, size, "%s", rj_strerror(ERROR_10000).c_str());
+        return ERROR_10000;
     }
+    snprintf(retbuf, size, "%s", cur.c_str());
 
-    strncpy(retbuf, cur.c_str(), size);
-
-    return 0;
+    return SUCCESS_0;
 }
 
 int setDeviceResolution(const char *res, int refresh)
 {
     CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
+    CHECK_STR_PARA(res);
     int ret = vm.setResolution(res);
+    if (ret < 0) {
+        rjlog_error("setResolution fail");
+        return ERROR_10000;
+    }
 
     return ret;
 }
@@ -264,13 +323,13 @@ int getSupportResolution(char *retbuf, size_t size)
     CHECK_FUNCTION_IN();
     string support = vm.getSupportResolution();
 
-    if (size > support.size()) {
-        size = support.size();
+    if (support.empty()) {
+        snprintf(retbuf, size, "%s", rj_strerror(ERROR_10000).c_str());
+        return ERROR_10000;
     }
+    snprintf(retbuf, size, "%s", support.c_str());
 
-    strncpy(retbuf, support.c_str(), size);
-
-    return 0;
+    return SUCCESS_0;
 }
 
 int getOptimumResolution(char *retbuf, size_t size)
@@ -279,13 +338,13 @@ int getOptimumResolution(char *retbuf, size_t size)
     CHECK_FUNCTION_IN();
     string optimum = vm.getOptimumResolution();
 
-    if (size > optimum.size()) {
-        size = optimum.size();
+    if (optimum.empty()) {
+        snprintf(retbuf, size, "%s", rj_strerror(ERROR_10000).c_str());
+        return ERROR_10000;
     }
+    snprintf(retbuf, size, "%s", optimum.c_str());
 
-    strncpy(retbuf, optimum.c_str(), size);
-
-    return 0;
+    return SUCCESS_0;
 }
 
 int shutDown()
@@ -294,10 +353,10 @@ int shutDown()
     CHECK_FUNCTION_IN();
 
     if (rj_system("shutdown -h now") < 0) {
-        return ERROR_10000;
+        return ERROR_11002;
     }
 
-    return 0;
+    return SUCCESS_0;
 }
 
 int reboot()
@@ -306,17 +365,17 @@ int reboot()
     CHECK_FUNCTION_IN();
 
     if (rj_system("reboot") < 0) {
-        return ERROR_10000;
+        return ERROR_11002;
     }
 
-    return 0;
+    return SUCCESS_0;
 }
 
 int setPowerState(int powerState)
 {
     CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
-    char type[64] = {0};
+    char type[SIZE_64] = {0};
     bool startAuto = powerState;
 
     getTermialType(type, sizeof(type));
@@ -336,20 +395,20 @@ int setPowerState(int powerState)
             idv_bios_nv_write_user(AC_POWER_VAR_NAME, 0);
         }
     } else {
-        rjlog_info("the TermialType is unidentifiable:%s", type);
+        rjlog_info("nonsupport this  termial type:%s", type);
         return ERROR_11001;
     }
 
     rjlog_info("bios_nv_write_user:%d", startAuto);
 
-    return 0;
+    return SUCCESS_0;
 }
 
 int getPowerState()
 {
     CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
-    char type[64] = {0};
+    char type[SIZE_64] = {0};
     unsigned int nv_value = 0;
 
     getTermialType(type, sizeof(type));
@@ -361,26 +420,25 @@ int getPowerState()
     } else if (strncmp(type, RJ_IDV_TYPE, sizeof(RJ_IDV_TYPE)) == 0) {
         idv_bios_nv_read_user(AC_POWER_VAR_NAME, &nv_value);
     } else {
-        rjlog_info("the TermialType is unidentifiable:%s", type);
+        rjlog_info("nonsupport this termial type:%s", type);
         return ERROR_11001;
     }
 
-    rjlog_info("idv_bios_nv_read_user:%d", nv_value);
+    rjlog_info("bios_nv_read_user:%d", nv_value);
 
-	if ((bool)nv_value) {
+    if ((bool)nv_value) {
         return 1;
     } else {
         return 0;
     }
 
-    return 0;
 }
 
 int setSleeptime(int second)
 {
     CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
-    char cmd[64] = {0};
+    char cmd[SIZE_64] = {0};
 
     if (second < 0) {
         rjlog_error("the para:%d is invalid", second);
@@ -392,38 +450,34 @@ int setSleeptime(int second)
         return ERROR_11002;
     }
 
-    return 0;
+    return SUCCESS_0;
 }
 
 int getHostname(char *hostname, size_t size)
 {
-    CHECK_INIT_INT();
+    CHECK_INIT_STR(hostname, size);
     CHECK_FUNCTION_IN();
     int len = 0;
-	char cmd[128] = {0};
-    char res[128] = {0};
-
-	if (NULL == hostname || size < 2) {
-		rjlog_error("the para is invalid");
-		return ERROR_11003;
-	}
-
-    if (size > sizeof(res)) {
-        size = sizeof(res);
-    }
+    char cmd[SIZE_128] = {0};
+    char res[SIZE_128] = {0};
 
     if (access(RJ_USR_CONFIG_PATH "hostname.ini", F_OK) != 0) {
         rjlog_info("Not found ini, Creat it.");
         snprintf(cmd, sizeof(cmd), "echo `hostname` > %s", RJ_USR_CONFIG_PATH "hostname.ini");
-        if (rj_system(cmd) < 0) {
+        if (rj_exec_result(cmd, res, sizeof(res)) < 0) {
             rjlog_error("cmd:%s error", cmd);
+            snprintf(hostname, size, "%s", rj_strerror(ERROR_11002).c_str());
+            return ERROR_11002;
         }
     }
 
+    memset(res, 0, sizeof(res));
+    memset(cmd, 0, sizeof(cmd));
     snprintf(cmd, sizeof(cmd), "cat %s", RJ_USR_CONFIG_PATH "hostname.ini");
     rj_exec_result(cmd, res, sizeof(res));
     if (res[0] == '\0') {
         rjlog_warn("the hostname.ini is empty");
+        snprintf(hostname, size, "%s", rj_strerror(ERROR_11002).c_str());
         return ERROR_11002;
     }
 
@@ -432,55 +486,55 @@ int getHostname(char *hostname, size_t size)
         res[len - 1] = '\0';
     }
 
-    strncpy(hostname, res, size);
+    snprintf(hostname, size, "%s", res);
 
-	return 0;
+    return SUCCESS_0;
 }
 
 int setHostname(const char *hostname)
 {
     CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
-	char cmd[0x200];
+    char cmd[SIZE_128] = {0};
 
-	if (NULL == hostname || strlen(hostname) > 0x80) {
-		rjlog_error("the para is invalid");
-		return ERROR_11003;
-	}
+    if (NULL == hostname || strlen(hostname) > 0x80) {
+        rjlog_error("the para is invalid");
+        return ERROR_11003;
+    }
 
     snprintf(cmd, sizeof(cmd), "echo %s > %s", hostname, RJ_USR_CONFIG_PATH "hostname.ini");
-	if (rj_system(cmd) < 0) {
-		rjlog_error("cmd:%s error", cmd);
-		return ERROR_11002;
-	}
+    if (rj_system(cmd) < 0) {
+        rjlog_error("cmd:%s error", cmd);
+        return ERROR_11002;
+    }
 
-	return 0;
+    return SUCCESS_0;
 }
 
-int syncServerTime(const char *serverip)
+int syncServerTime_block(const char *serverip)
 {
     CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
     if (check_ipaddr(serverip) != 0) {
-		rjlog_error("the ip:%s is invalid", serverip);
-		return ERROR_11003;
+        rjlog_error("the ip:%s is invalid", serverip);
+        return ERROR_11003;
     }
-    char cmd[64] = {0};
+    char cmd[SIZE_64] = {0};
 
     //sync the time from server
     snprintf(cmd, sizeof(cmd), "ntpdate %s", serverip);
-	if (rj_system(cmd) < 0) {
-		rjlog_error("cmd:%s error", cmd);
-		return ERROR_11002;
-	}
+    if (rj_system(cmd) < 0) {
+        rjlog_error("cmd:%s error", cmd);
+        return ERROR_11002;
+    }
 
     //sync the time to hardware
-	if (rj_system("hwclock --systohc") < 0) {
-		rjlog_error("cmd:hwclock --systohc error", cmd);
-		return ERROR_11002;
-	}
+    if (rj_system("hwclock --systohc") < 0) {
+        rjlog_error("cmd:hwclock --systohc error", cmd);
+        return ERROR_11002;
+    }
 
-    return 0;
+    return SUCCESS_0;
 }
 
 int setLanguage(const char *language)
@@ -489,10 +543,10 @@ int setLanguage(const char *language)
     CHECK_FUNCTION_IN();
     CHECK_STR_PARA(language);
     if (access(RJ_SCRIPT_PATH "setLanguage", F_OK) != 0) {
-    	rjlog_error("setLanguage script Not found please Check.");
+        rjlog_error("setLanguage script Not found please Check.");
         return ERROR_11000;
     }
-	char cmd[128] = {0};
+    char cmd[SIZE_128] = {0};
 
     if (strncmp(language, RJ_LANG_CHINESE, sizeof(RJ_LANG_CHINESE)) == 0) {
         snprintf(cmd, sizeof(cmd), "bash " RJ_SCRIPT_PATH "setLanguage " RJ_LANG_CHINESE);
@@ -511,7 +565,7 @@ int setLanguage(const char *language)
         return ERROR_11001;
     }
 
-    return 0;
+    return SUCCESS_0;
 }
 
 int startConsole()
@@ -519,18 +573,42 @@ int startConsole()
     CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
 
-    if (rj_system("roxterm -e login -p") < 0) {
+    if (rj_system("xterm -e login -p") < 0) {
         return ERROR_11002;
     }
 
-    return 0;
+    return SUCCESS_0;
 }
 
-int getUsbPathForOffine(char *retbuf)
+int getUsbPathForOffine(char *retbuf, size_t size)
 {
     CHECK_INIT_INT();
     CHECK_FUNCTION_IN();
-    return 0;
+    return SUCCESS_0;
+}
+
+int mountUsb(const char *dev, char *retbuf, size_t size)
+{
+    CHECK_INIT_INT();
+    CHECK_FUNCTION_IN();
+
+    return SUCCESS_0;
+}
+
+int getUsbList(char *retbuf, size_t size)
+{
+    CHECK_INIT_INT();
+    CHECK_FUNCTION_IN();
+
+    return SUCCESS_0;
+}
+
+int unmountUsb(const char *path)
+{
+    CHECK_INIT_INT();
+    CHECK_FUNCTION_IN();
+
+    return SUCCESS_0;
 }
 
 #ifdef __cplusplus

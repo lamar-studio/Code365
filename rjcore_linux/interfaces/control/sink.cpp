@@ -38,6 +38,10 @@ void Sink::autoDefault(AudioCore *ac) {
             def_name = w->name;
             break;
         } else if (strstr(w->prio_type.c_str(), "HDMI") != NULL || strstr(w->prio_type.c_str(), "hdmi") != NULL) {
+            if (!ac->bHDMI) {
+                continue;
+            }
+
             if (hdmi_name.empty()) {
                 hdmi_name = w->name;
             }
@@ -54,8 +58,12 @@ void Sink::autoDefault(AudioCore *ac) {
         def_name = hdmi_name.empty() ? ana_name : hdmi_name;
     }
 
+    if (def_name.empty()) {
+        rjlog_warn("the default device is empty");
+        return;
+    }
+
     rjlog_info("[Sink]:%s", def_name.c_str());
-    ac->updateSinkVolume();
     if (def_name == ac->defaultSinkName) {
         rjlog_info("the same as defaultSinkName");
         return;
@@ -63,6 +71,7 @@ void Sink::autoDefault(AudioCore *ac) {
 
     updateDefault(def_name.c_str());
     ac->defaultSinkName = def_name;
+    //ac->updateSinkVolume();
 
     //move sinkInput to default
     for (std::map<uint32_t, SinkInput*>::iterator it = ac->sinkInputs.begin(); it != ac->sinkInputs.end(); ++it)

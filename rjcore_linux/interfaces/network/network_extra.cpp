@@ -24,6 +24,70 @@ void network_del()
     }
 }
 
+int rj_execstring(const char *cmd, string &resevc)
+{
+    int num = 0;
+    resevc.clear();
+
+    if (cmd == NULL || strlen(cmd) == 0) {
+        return -1;
+    }
+
+    FILE *pp = popen(cmd, "r");
+    if (!pp) {
+        return -1;
+    }
+
+    char tmp[1024];
+    while (fgets(tmp, sizeof(tmp), pp) != NULL) {
+        resevc.append(tmp);
+        num++;
+    }
+    pclose(pp);
+
+    return num;
+}
+
+int networkEventJudge(const string& data)
+{
+    if (data.empty()) {
+        rjlog_error("network callbak event is empty");
+        return -1;
+    }
+
+    int i = 0;
+
+    for (std::vector<string>::const_iterator it = Network_Event.begin() ; it != Network_Event.end(); ++it) {
+        string param = *it;
+
+        if ((data.find(param.c_str()) != string::npos)) {
+            return i;
+        }
+        i++;
+    }
+
+    return -1;
+}
+
+int wifiEventJudge(const string& data)
+{
+    if (data.empty()) {
+        rjlog_error("wifi callbak event is empty");
+        return -1;
+    }
+
+    int i = 0;
+    for (std::vector<string>::const_iterator it = Wifi_Event.begin() ; it != Wifi_Event.end(); ++it) {
+        string param = *it;
+        if ((data.find(param.c_str()) != string::npos)) {
+            return i;
+        }
+        i++;
+    }
+
+    return -1;
+}
+
 int onEvent(void* data, size_t len, void *ctx)
 {
     string event;
@@ -31,17 +95,27 @@ int onEvent(void* data, size_t len, void *ctx)
     string eventName;
     int eventType;
     string eventContent;
-    eventContent.append("");
+    eventContent.assign("");
 
     event.assign((const char*)data, len);
 
     rjlog_info("get event: %s", event.c_str());
 
-    eventName.append("NetworkEvent");
+    int ret = -1;
+    if (networkEventJudge(event) < 0) {
+        ret = wifiEventJudge(event);
+        if (ret < 0) {
+            rjlog_error("unvailed event");
+            return -1;
+        }
+        eventName.assign("WifiEvent");
+    } else {
+        eventName.assign("NetworkEvent");
+    }
+
     while (1) {
 
         if (eventName.compare("NetworkEvent") == 0) {
-
             if ((pos = event.find("ETH_DOWN")) == 0) {
                 eventType = ETH_DOWN;
                 pos += strlen("ETH_DOWN");
@@ -63,6 +137,24 @@ int onEvent(void* data, size_t len, void *ctx)
             } else if ((pos = event.find("IP_UNAVAILABLE_br0")) == 0) {
                 eventType = ETH_NO_IP;
                 pos += strlen("IP_UNAVAILABLE_br0");
+            } else if ((pos = event.find("IP_UNAVAILABLE_eth0")) == 0) {
+                eventType = ETH_NO_IP;
+                pos += strlen("IP_UNAVAILABLE_eth0");
+            } else if ((pos = event.find("IP_CONFLICT")) == 0) {
+                eventType = IP_CONFLICT;
+                int conflict_pos1 = event.find("\t");
+                pos += strlen("IP_CONFLICT");
+                if (conflict_pos1 > 0) {
+                    pos += strlen("\t");
+                    int conflict_pos2 = event.find("\t", conflict_pos1+1);
+                    if (conflict_pos2 > 0) {
+                        int conflict_size = conflict_pos2 - conflict_pos1;
+                        if (conflict_size > 0) {
+                            eventContent = event.substr(conflict_pos1+1, conflict_size);
+                        }
+                        pos += conflict_size + strlen("\t");
+                    }
+                }
             } else if (event.find("TERMINATING") == 0) {
                 rjlog_error("service terminating connection!");
                 eventType = TERMINATING;
@@ -123,7 +215,7 @@ bool reconnect(RjClient*& client, bool attach)
 
 void restartNetworkDaemon()
 {
-    char cmd[256];
+    char cmd[command_size];
 
     sprintf(cmd, "pkill network_daemon");
 
@@ -150,4 +242,39 @@ int parseFtpInfo(const string& cmd, ftpInfo& ftpinfo)
     ftpinfo.timeout = rc_json_get_int(cmd,"timeout");
 
     return 0;
+}
+
+int acquireIPOnly(const char *interface, char *buf, size_t size)
+{
+    char cmd[command_size];
+
+    string buf_str;
+
+    sprintf(cmd, "ifconfig %s | grep 'inet addr' | awk '{print $2}' | awk -F: '{print $2}'", interface);
+    int num = rj_execstring(cmd, buf_str);
+    if (num <= 0) {
+        rjlog_info("have no ip");
+        memset(cmd, 0 , command_size);
+
+        sprintf(cmd, "ifconfig %s:avahi | grep 'inet addr:169' | grep -v '127.0.0.1' \
+              | cut -d: -f2 | awk '{print $1}'", interface);
+        num = rj_execstring(cmd, buf_str);
+        if (num <=0 ) {
+            rjlog_info("have no wired avahi");
+            snprintf(buf, size, "0.0.0.0");
+            return NOT_CARE;
+        } else {
+            if (buf_str.size() < size) {
+                size = buf_str.size();
+            }
+            strncpy(buf, buf_str.c_str(), size);
+        }
+     } else {
+        if (buf_str.size() < size) {
+            size = buf_str.size();
+        }
+        strncpy(buf, buf_str.c_str(), size);
+    }
+
+    return RIGHT_RESULT;
 }

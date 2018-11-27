@@ -12,7 +12,9 @@ pthread_once_t  AudioCore::mOnce;
 AudioCore::AudioCore()
     : defaultSinkIdx(0),
       defaultSourceIdx(0),
+      innerCardIdx(0),
       context(NULL),
+      bHDMI(false),
       api(NULL),
       m(NULL),
       retry(3),
@@ -119,17 +121,19 @@ void AudioCore::server_info_cb(pa_context *, const pa_server_info *i, void *user
     }
 
     w->updateServer(*i);
+    w->updateSinkVolume();
 }
 
 void AudioCore::subscribe_cb(pa_context *c, pa_subscription_event_type_t t, uint32_t index, void *userdata) {
     AudioCore *w = static_cast<AudioCore*>(userdata);
-    rjlog_info(" case:%#x", t & PA_SUBSCRIPTION_EVENT_FACILITY_MASK);
+    rjlog_info(" case:%#x, type:%#x", t&PA_SUBSCRIPTION_EVENT_FACILITY_MASK, t&PA_SUBSCRIPTION_EVENT_TYPE_MASK);
     switch (t & PA_SUBSCRIPTION_EVENT_FACILITY_MASK) {
         case PA_SUBSCRIPTION_EVENT_SINK:     //0x0000U
             if ((t & PA_SUBSCRIPTION_EVENT_TYPE_MASK) == PA_SUBSCRIPTION_EVENT_REMOVE) {
                 w->removeSink(index);
                 Sink::autoDefault(w);
-            } else {
+            } else if ((t & PA_SUBSCRIPTION_EVENT_TYPE_MASK) == PA_SUBSCRIPTION_EVENT_NEW ||
+                       (t & PA_SUBSCRIPTION_EVENT_TYPE_MASK) == PA_SUBSCRIPTION_EVENT_CHANGE) {
                 pa_operation *o;
                 if (!(o = pa_context_get_sink_info_by_index(c, index, sink_cb, w))) {
                     rjlog_error("pa_context_get_sink_info_by_index() failed");
@@ -143,7 +147,7 @@ void AudioCore::subscribe_cb(pa_context *c, pa_subscription_event_type_t t, uint
             if ((t & PA_SUBSCRIPTION_EVENT_TYPE_MASK) == PA_SUBSCRIPTION_EVENT_REMOVE) {
                 w->removeSource(index);
                 Source::autoDefault(w);
-            } else {
+            } else if ((t & PA_SUBSCRIPTION_EVENT_TYPE_MASK) == PA_SUBSCRIPTION_EVENT_NEW) {
                 pa_operation *o;
                 if (!(o = pa_context_get_source_info_by_index(c, index, source_cb, w))) {
                     rjlog_error("pa_context_get_source_info_by_index() failed");
@@ -156,7 +160,7 @@ void AudioCore::subscribe_cb(pa_context *c, pa_subscription_event_type_t t, uint
         case PA_SUBSCRIPTION_EVENT_SINK_INPUT:     //0x0002U
             if ((t & PA_SUBSCRIPTION_EVENT_TYPE_MASK) == PA_SUBSCRIPTION_EVENT_REMOVE) {
                 w->removeSinkInput(index);
-            } else {
+            } else if ((t & PA_SUBSCRIPTION_EVENT_TYPE_MASK) == PA_SUBSCRIPTION_EVENT_NEW) {
                 pa_operation *o;
                 if (!(o = pa_context_get_sink_input_info(c, index, sink_input_cb, w))) {
                     rjlog_error("pa_context_get_sink_input_info() failed");
@@ -169,7 +173,7 @@ void AudioCore::subscribe_cb(pa_context *c, pa_subscription_event_type_t t, uint
         case PA_SUBSCRIPTION_EVENT_SOURCE_OUTPUT:     //0x0003U
             if ((t & PA_SUBSCRIPTION_EVENT_TYPE_MASK) == PA_SUBSCRIPTION_EVENT_REMOVE) {
                 w->removeSourceOutput(index);
-            } else {
+            } else if ((t & PA_SUBSCRIPTION_EVENT_TYPE_MASK) == PA_SUBSCRIPTION_EVENT_NEW) {
                 pa_operation *o;
                 if (!(o = pa_context_get_source_output_info(c, index, source_output_cb, w))) {
                     rjlog_error("pa_context_get_sink_input_info() failed");
@@ -205,6 +209,7 @@ void AudioCore::context_state_callback(pa_context *c, void *userdata) {
         case PA_CONTEXT_READY: {
             pa_operation *o;
             w->mInited = true;
+            w->bHDMI = getHdmiVoiceStatus();
 
             pa_context_set_subscribe_callback(c, subscribe_cb, w);
             if (!(o = pa_context_subscribe(c, (pa_subscription_mask_t)
@@ -272,11 +277,21 @@ void AudioCore::context_state_callback(pa_context *c, void *userdata) {
     }
 }
 
-void AudioCore::get_sink_volume_callback(pa_context *, const pa_sink_info *i, int, void *userdata) {
+void AudioCore::get_sink_volume_callback(pa_context *c, const pa_sink_info *i, int eol, void *userdata) {
     AudioCore *w = static_cast<AudioCore *>(userdata);
-    if (i) {
-        w->sinkVol = i->volume;
+    if (eol < 0) {
+        if (pa_context_errno(w->context) == PA_ERR_NOENTITY)
+            return;
+
+        rjlog_error("get_sink_volume_callback failure");
+        return;
     }
+
+    if (eol > 0) {
+        return;
+    }
+
+    w->sinkVol = i->volume;
 
     //pa_threaded_mainloop_signal(This->m_mainloop, 0);
 }
@@ -292,7 +307,6 @@ void AudioCore::updateSinkVolume() {
     pa_operation_unref(o);
     //wait_loop(o, m_mainloop);
 }
-
 
 bool AudioCore::paConnect(void *userdata) {
     AudioCore *w = static_cast<AudioCore*>(userdata);
@@ -387,9 +401,10 @@ out:
     return NULL;
 }
 
-bool AudioCore::paStart() {
+bool AudioCore::paStart(std::string type) {
     pthread_t pid_t;
 
+    termialType = type;
     if (pthread_create(&pid_t, NULL, main_loop, this) != 0) {
         rjlog_error("pthread_create err:%s", strerror(errno));
         return false;
@@ -431,10 +446,7 @@ bool AudioCore::paStop() {
 
 void AudioCore::updateSink(const pa_sink_info &info) {
     Sink *w;
-    char type[64] = {0};
     std::string vdiBuiltInUsb("pci-0000:00:14.0-usb-0:3:1.0");
-    rjlog_info(" desc:%s index:%d", info.description, info.index);
-    getTermialType(type, sizeof(type));
 
     if (sinks.count(info.index)) {
         w = sinks[info.index];
@@ -444,12 +456,22 @@ void AudioCore::updateSink(const pa_sink_info &info) {
         w->prio_type = pa_proplist_gets(info.proplist, "alsa.name");
 
         //adapter to the VDI inner USB audio
-        if (strncmp(type, RJ_VDI_TYPE, sizeof(RJ_VDI_TYPE)) == 0) {
+        if (termialType.compare(RJ_VDI_TYPE) == 0) {
             if (strstr(w->prio_type.c_str(), "USB") != NULL || strstr(w->prio_type.c_str(), "usb") != NULL) {
                 if (vdiBuiltInUsb == pa_proplist_gets(info.proplist, "device.bus_path")) {
                     w->prio_type = "inner analog";
+                    innerCardIdx = info.card;
+                    innerCardName = "VDI inner USB";
                 }
             }
+        } else if (termialType.compare(RJ_IDV_TYPE) == 0) {
+            if (strstr(w->prio_type.c_str(), "USB") == NULL || strstr(w->prio_type.c_str(), "usb") == NULL) {
+                w->prio_type = "inner analog";
+                innerCardIdx = info.card;
+                innerCardName = "IDV inner alc662";
+            }
+        } else {
+            rjlog_warn("nonsupport this termial type:%s", termialType.c_str());
         }
     }
 
@@ -457,6 +479,7 @@ void AudioCore::updateSink(const pa_sink_info &info) {
     w->name = info.name;
     w->description = info.description;
 
+    rjlog_info(" prio_type:%s index:%d", w->prio_type.c_str(), info.index);
     Sink::autoDefault(this);
 
     return;
@@ -464,7 +487,7 @@ void AudioCore::updateSink(const pa_sink_info &info) {
 
 void AudioCore::updateSource(const pa_source_info &info) {
     Source *w;
-    rjlog_info(" desc:%s index:%d", info.description, info.index);
+    std::string vdiBuiltInUsb("pci-0000:00:14.0-usb-0:3:1.0");
 
     if (sources.count(info.index)) {
         w = sources[info.index];
@@ -473,12 +496,23 @@ void AudioCore::updateSource(const pa_source_info &info) {
 
         w->index = info.index;
         w->prio_type = pa_proplist_gets(info.proplist, "alsa.name");
+
+        //adapter to the VDI inner USB audio
+        if (termialType.compare(RJ_VDI_TYPE) == 0) {
+            if (strstr(w->prio_type.c_str(), "USB") != NULL || strstr(w->prio_type.c_str(), "usb") != NULL) {
+                if (vdiBuiltInUsb == pa_proplist_gets(info.proplist, "device.bus_path")) {
+                    w->prio_type = "inner analog";
+                }
+            }
+        }
+
     }
 
     w->card_index = info.card;
     w->name = info.name;
     w->description = info.description;
 
+    rjlog_info(" prio_type:%s index:%d", w->prio_type.c_str(), info.index);
     Source::autoDefault(this);
 
     return;
@@ -608,12 +642,10 @@ int AudioCore::setSinkVolume(int volume) {
         rjlog_error("the audio module init fail");
         return -1;
     }
-
-    rjlog_info("defName:%s, vol:%d", defaultSinkName.c_str(), volume);
     pa_operation *o;
     pa_volume_t vol = math_util::percentage_to_value<pa_volume_t>(volume, PA_VOLUME_MUTED, PA_VOLUME_NORM);
     pa_cvolume_scale(&sinkVol, vol);
-    rjlog_info("set the vol:%d", vol);
+    rjlog_info("ui_vol:%d actual_val:%d", volume, vol);
 
     if (!(o = pa_context_set_sink_volume_by_name(context, defaultSinkName.c_str(), &sinkVol, NULL, NULL))) {
         rjlog_error("pa_context_set_sink_volume_by_name() failed");
@@ -631,9 +663,59 @@ int AudioCore::getSinkVolume() {
     }
 
     int vol = static_cast<int>(pa_cvolume_max(&sinkVol) * 100.0f / PA_VOLUME_NORM + 0.5f);
-    rjlog_info("vol:%d", vol);
+    rjlog_info("ui_vol:%d", vol);
 
     return vol;
+}
+
+int AudioCore::changeProfile(const char *profileName) {
+    if (mInited == false) {
+        rjlog_error("the audio module init fail");
+        return -1;
+    }
+
+    if (innerCardName.empty()) {
+        rjlog_error("not found the inner card");
+        return -1;
+    }
+
+    if (strncmp(profileName, RJ_HDMI_AUDIO, strlen(RJ_HDMI_AUDIO)) == 0) {
+        bHDMI = true;
+        if (termialType.compare(RJ_IDV_TYPE) == 0) {
+            pa_operation* o;
+
+            if (!(o = pa_context_set_card_profile_by_index(context, innerCardIdx, HDMI_PROFILE, NULL, NULL))) {
+                rjlog_error("pa_context_set_card_profile_by_index() failed");
+                return -1;
+            }
+            pa_operation_unref(o);
+        } else if (termialType.compare(RJ_VDI_TYPE) == 0) {
+            Sink::autoDefault(this);
+        } else {
+            rjlog_warn("nonsupport this termial type");
+            return -1;
+        }
+    } else if (strncmp(profileName, RJ_ANALOG_AUDIO, strlen(RJ_ANALOG_AUDIO)) == 0) {
+        bHDMI = false;
+        if (termialType.compare(RJ_IDV_TYPE) == 0) {
+            pa_operation* o;
+
+            if (!(o = pa_context_set_card_profile_by_index(context, innerCardIdx, ANA_PROFILE, NULL, NULL))) {
+                rjlog_error("pa_context_set_card_profile_by_index() failed");
+                return -1;
+            }
+            pa_operation_unref(o);
+        } else if (termialType.compare(RJ_VDI_TYPE) == 0) {
+            Sink::autoDefault(this);
+        } else {
+            rjlog_warn("nonsupport this termial type");
+            return -1;
+        }
+    }
+
+    rjlog_info("profileName:%s innerCard:%s", profileName, innerCardName.c_str());
+
+    return 0;
 }
 
 

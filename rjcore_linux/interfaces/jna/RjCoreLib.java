@@ -30,7 +30,7 @@ public interface RjCoreLib extends Library {
     public int setSleeptime(int time);
     public int getHostname(byte[] retbuf, int size);
     public int setHostname(String hostname);
-    public int syncServerTime(String serverip);
+    public int syncServerTime_block(String serverip);
     public int setLanguage(String language);
     public int startConsole();
     public int getUsbPathForOffine(byte[] retbuf);
@@ -67,28 +67,30 @@ public interface RjCoreLib extends Library {
 /* sysmisc end */
 
 /* bt start */
-    public void BT_MakeSeed_block(String request, byte[] respone);
-    public void BT_MakeSeed_cancel(String request, byte[] respone);
-    public void BT_Share_Start (String request, byte[] respone);
-    public void BT_Share_Stop (String request, byte[] respone);
-    public void BT_Download_block(String request, byte[] respone);
-    public void BT_Download_cancle(String request, byte[] respone);
-    public void BT_Get_Status (String request, byte[] respone);
+    public void BtMakeSeed_block(String request, byte[] respone,int reslen);
+    public void BtMakeSeedCancel(String request, byte[] respone,int reslen);
+    public void BtShare_Start (String request, byte[] respone,int reslen);
+    public void BtShare_Stop (String request, byte[] respone,int reslen);
+    public void BtDownload_block(String request, byte[] respone,int reslen);
+    public void BtDownloadCancle(String request, byte[] respone,int reslen);
+    public void BtGetStatus (String request, byte[] respone,int reslen);
 /* bt end */
 
 /* application start */
     public int isProcessRunning(String processname);
-    public int startProcess(String processname);
-    public int installDeb_block(String debPath);
-    public int uninstallDeb_block(String debPath);
+    public int startProcess(String path, String processname);
+    public int installDeb_block(String debPath, String debName);
+    public int uninstallDeb_block(String debName);
     public int mergeDeltaPacket_block(String old, String delta, String newpack);
 /* application end */
 
 /* network start */
     public int network();
+    public int getDnsMode();
     public int getWiredMac(byte[] retbuf, int length);
     public int getNetStatus_block();
     public int getIPInfo_block(byte[] retbuf, int length);
+    public int getIPOnly(int type, byte[] retbuf, int length);
     public int checkPingIp_block(String ip, byte[] retbuf, int length);
     public int getCurCardSpeed(byte[] retbuf, int length);
     public int getMaxCardSpeed();
@@ -98,6 +100,23 @@ public interface RjCoreLib extends Library {
     public int setIP_block(String info, byte[] retbuf, int length);
     public int startFtpUpload_block(String uploadInfo);
     public int startFtpDownload_block(String downloadInfo, byte[] retbuf, int length);
+
+    //follow interface is used to wifi
+    public int getNetCardStatus(int card_type);
+    public int getWifiStatus_block();
+    public int getWifiSavedList_block(byte[] retbuf, int length);
+    public int getScanResult_block(byte[] retbuf, int length);
+    public int getWifiInfo_block(byte[] retbuf, int length);
+    public int getWhiteList_block(byte[] retbuf, int length);
+    public int setNetCard(int card_type, boolean disable);
+    public int setForceScan_block(byte[] retbuf, int length);
+    public int setConnectInfo_block(String info);
+    public int setConnectId_block(int net_id);
+    public int setForgetId_block(int net_id);
+    public int setDisconnect_block();
+    public int setWhiteList_block(String info);
+    public int checkWifiTerminal_block();
+    public int checkWifiSaved_block(String info);
 /* network end */
 
 /* log start */

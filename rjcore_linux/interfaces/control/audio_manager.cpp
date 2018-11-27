@@ -62,10 +62,10 @@ void AudioManager::doJsonCommand(int handle, const string& json)
     }
 }
 
-int AudioManager::startPaService()
+int AudioManager::startPaService(const char *type)
 {
     CHECK_FUNCTION_IN();
-    return (AudioCore::getInstance()->paStart() == true) ? 0 : -1;
+    return (AudioCore::getInstance()->paStart(type) == true) ? 0 : -1;
 }
 int AudioManager::stopPaService()
 {
@@ -82,5 +82,17 @@ int AudioManager::getVolume()
 {
     return AudioCore::getInstance()->getSinkVolume();
 }
+
+int AudioManager::changeHDMI(const char *profilename)
+{
+    return AudioCore::getInstance()->changeProfile(profilename);
+}
+
+int AudioManager::getHDMI()
+{
+    //AudioCore::getInstance()->getActiveProfile();
+    return 0;
+}
+
 
 } //namespace
