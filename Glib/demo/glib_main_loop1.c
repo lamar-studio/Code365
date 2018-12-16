@@ -44,7 +44,7 @@ void tmsg(char* msg) {
  *  -- called until this returns FALSE when it will be removed */
 gboolean tmo_callback(gpointer data) {
     printf("%s\n", (char*)data);
-    //tmsg((char*)data);
+    tmsg((char*)data);
     return TRUE;
 }
 
@@ -54,7 +54,7 @@ int main()
 {
     tmsg("Starting");
 
-    int tmo = 1;  /* seconds for callback */
+    int tmo = 3;  /* seconds for callback */
     GMainLoop* main_loop = NULL;
 
     main_loop = g_main_loop_new (NULL, FALSE);
