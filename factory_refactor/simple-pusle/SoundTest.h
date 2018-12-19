@@ -12,7 +12,7 @@ public:
     SoundTest();
     ~SoundTest();
 
-    bool init();
+    bool initVolume();
     bool deInit();
 
     bool startPlayback();
