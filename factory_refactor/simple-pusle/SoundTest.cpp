@@ -18,6 +18,8 @@
 static int pa_error;
 static int rec_stop = 0;
 static int play_stop = 0;
+static pthread_t rec_pid;
+static pthread_t play_pid;
 
 static const pa_sample_spec ss = {
         .format = PA_SAMPLE_S16LE,
@@ -51,8 +53,6 @@ static void *recordLoop(void *arg)
     FILE *outfile = NULL;
     pa_simple *pa_rec = NULL;
 
-    pthread_detach(pthread_self());
-
     /* Create the recording stream */
     pa_rec = pa_simple_new(NULL,
             APP_NAME,
@@ -74,8 +74,8 @@ static void *recordLoop(void *arg)
     }
 
     while (!rec_stop) {
-        mlog("in the recordLoop");
         uint8_t buf[BUF_SIZE];
+        mlog("in the recordLoop buf:%p buf:%d,%d,%d,%d,%d", buf, buf[0], buf[1], buf[2], buf[3], buf[4]);
 
         /* Record some data ... */
         if (pa_simple_read(pa_rec, buf, sizeof(buf), &pa_error) < 0) {
@@ -111,8 +111,6 @@ static void *playbackLoop(void *arg)
     FILE *infile = NULL;
     pa_simple *pa_play = NULL;
 
-    pthread_detach(pthread_self());
-
     /* Create a new playback stream */
     pa_play = pa_simple_new(NULL,
             APP_NAME,
@@ -133,10 +131,9 @@ static void *playbackLoop(void *arg)
     }
 
     while (!play_stop) {
-        mlog("in the playbackLoop");
-        uint8_t buf[BUF_SIZE];
+        uint8_t buf[BUF_SIZE] = {0};
         ssize_t ret;
-
+        mlog("in the playbackLoop buf:%p buf:%d,%d,%d,%d,%d", buf, buf[0], buf[1], buf[2], buf[3], buf[4]);
         /* read some data */
         if ((ret = fread(buf, 1, sizeof(buf), infile)) <= 0) {
             if (ret == 0) {     /* EOF */
@@ -188,9 +185,8 @@ SoundTest::~SoundTest()
 bool SoundTest::startRecord()
 {
     log("sound test record start");
-    pthread_t rec_thread;
     rec_stop = 0;
-    pthread_create(&rec_thread, NULL, recordLoop, NULL);
+    pthread_create(&rec_pid, NULL, recordLoop, NULL);
 
     return SUCCESS;
 }
@@ -199,6 +195,7 @@ bool SoundTest::stopRecord()
 {
     log("sound test record stop");
     rec_stop = 1;
+    pthread_join(rec_pid, NULL);
 
     return SUCCESS;
 }
@@ -206,9 +203,8 @@ bool SoundTest::stopRecord()
 bool SoundTest::startPlayback()
 {
     log("sound test playback start");
-    pthread_t play_thread;
     play_stop = 0;
-    pthread_create(&play_thread, NULL, playbackLoop, NULL);
+    pthread_create(&play_pid, NULL, playbackLoop, NULL);
 
     return SUCCESS;
 }
@@ -217,6 +213,7 @@ bool SoundTest::stopPlayback()
 {
     log("sound test playback stop");
     play_stop = 1;
+    pthread_join(play_pid, NULL);
 
     return SUCCESS;
 }

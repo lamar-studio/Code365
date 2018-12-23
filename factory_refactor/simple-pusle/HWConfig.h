@@ -11,7 +11,7 @@
 #define SUCCESS   (0)
 #define FAIL      (-1)
 
-#define DEBUG     (0)
+#define DEBUG     (1)
 #define log(format, args...)  printf(format"\n", ##args)
 #define mlog(format, args...)                                 \
     do {                                                      \
