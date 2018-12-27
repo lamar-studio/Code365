@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+
+cnt=1
+
+# prepare for SoundTest
+#modprobe snd_hda_intel
+until /usr/bin/pulseaudio --check
+do 
+  /usr/bin/pulseaudio --start --log-target=syslog
+  echo `date` start PulseAudio cnt:$cnt
+  if [ $cnt -ge 5 ];then
+    echo `date` start PulseAudio fail cnt:$cnt
+    break;
+  fi
+  let cnt=$cnt+1
+  sleep 1
+done
+
