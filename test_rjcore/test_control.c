@@ -1,4 +1,9 @@
-
+/*
+ * decs: test for sysabslayer_linux cpp interface
+ *
+ * make: gcc -o test test_control.c -lsysabslayer_linux
+ * author: LaMar
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,9 +11,7 @@
 #include <stdbool.h>
 #include <string.h>
 
-
-#include "sysrjcore_linux.h"
-
+#include "sysabslayer_linux.h"
 
 #define DEBUG     (0)
 #define log(format, args...)  printf(format"\n", ##args)
@@ -16,7 +19,6 @@
     do {                                                      \
             if(DEBUG) printf(format"\n", ##args);             \
         } while(0)
-
 
 int main()
 {
@@ -33,7 +35,7 @@ int main()
                   "ArchLinux", "Win7", "WinXP", "Win10", "CentOS"};
     const char *lang[] = {"chinese", "english", "zhongwen", "yinwen"};
     char buf[128] = {0};
-    Init("shine", NULL);
+    InitForEST("est", NULL);
     sleep(1);
 
     while(1) {
@@ -53,11 +55,15 @@ int main()
         log("setVoiceVolume:%d", vol);
         log("getVoiceVolume:%d", getVoiceVolume());
         */
-        usleep(500);
-        setHdmiVoiceStatus(stat);
-        log("setHdmiVoiceStatus:%d", stat);
-        log("getHdmiVoiceStatus:%d", getHdmiVoiceStatus());
-        stat = !stat;
+        sleep(1);
+        log("isSupportBrightness:%d", isSupportBrightness());
+        sleep(1);
+        log("getBrightness:%d", getBrightness());
+        sleep(1);
+        btness = btness + 5;
+        if (btness >= 100)
+            btness = 0;
+        setBrightness(btness);
         /*
         usleep(500);
         setPowerState(stat);
