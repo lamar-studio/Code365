@@ -4,6 +4,7 @@
 
 # Check
   You can use the cmd:"pacmd list-sinks", then ensure the flags, you will not found the HW_VOLUME_CTRL flag.
+  
   Like follow(this case without these config):
 ```
     index: 0
