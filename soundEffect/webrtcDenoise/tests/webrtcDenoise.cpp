@@ -2,13 +2,13 @@
  * this demo is test for webrtc denoise function.
  *
  * Para:
- *    samplerate=16K, framesize=320, frametime=20ms
+ *    samplerate=16K, framesize=320, frametime=10ms
  *
  * Usage:
- *    ./speexDenoise < in.pcm > out.pcm
+ *    ./webrtcDenoise in.pcm out.pcm
  *
  * Build:
- *    -lspeexdsp
+ *    base on cmake
  *
  * Author:
  *    @LaMar
