@@ -1,0 +1,11 @@
+# the config for Noise-Cancellation 
+#
+
+
+### Enable Echo/Noise-Cancellation
+load-module module-echo-cancel sink_properties="device.master_device='card0p'" source_properties="device.master_device='card0c'" aec_method=webrtc aec_args="analog_gain_control=0 digital_gain_control=1" source_name=inner_card_echo_cancel_source sink_name=inner_card_echo_cancel_sink channels=2
+set-default-source inner_card_echo_cancel_source
+set-default-sink inner_card_echo_cancel_sink
+
+
+
