@@ -17,3 +17,8 @@ do
   sleep 1
 done
 
+# pulseaudio start para(for debug)
+
+# /usr/bin/pulseaudio --start --log-target=file:/var/log/pulse.log --log-meta=true --log-time=true --verbose
+
+
