@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# README:
+# This script is use to parse the Hard Disk Information(HDD/SSD)
+# Depend on SMART(Self-Monitoring Analysis and Reporting Technology) protocol
+# Now have four fields as follow,You can extend by SMART protocol in the futrue
+
+devType=''
+totalWritten=''
+powerOnHours=''
+curTemp=''
+
+devpath=`ls /sys/block/sd[a-z] -d 2>/dev/null`
+if [ -n "$devpath" ]; then
+    for path in `realpath $devpath  | grep -v -E "/usb[0-9]+/"`
+    do
+        devlist="$devlist `basename $path`"
+    done
+else
+	echo 'Not found the hard disk device'
+	exit 1
+fi
+
+if [ -n "$devlist" ]; then
+    for sdev in $devlist
+    do
+        smartInfo=`smartctl --all /dev/$sdev`
+        ret=$?
+        if [ ! $ret -eq 0 ]; then
+            echo 'failed to run cmd: smartctl'
+        fi
+		buf=`echo -e "$smartInfo" | grep "Rotation Rate:" | tr -cd "[0-9]"`
+		if [ -n "$buf" ]; then
+			devType=HDD
+		else
+			devType=SSD
+		fi
+		totalWritten=`echo -e "$smartInfo" | grep ^241 | awk '$0=$NF'`
+		powerOnHours=`echo -e "$smartInfo" | grep ^"  "9 | awk '$0=$NF'`	
+		curTemp=`echo -e "$smartInfo" | grep ^194 | awk '{print $10}'`
+
+		[ -n "$devType" ] && echo devType_$sdev=$devType
+		[ -n "$totalWritten" ] && echo totalWritten_$sdev=$totalWritten
+		[ -n "$powerOnHours" ] && echo powerOnHours_$sdev=$powerOnHours
+		[ -n "$curTemp" ] && echo curTemp_$sdev=$curTemp
+    done
+	exit 0
+fi
+exit 1
