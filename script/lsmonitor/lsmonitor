@@ -1,0 +1,288 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:          lsmonitor
+# Required-Start:    $syslog
+# Required-Stop:     $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Monitor Linkstation LS-CHLv2 and LS-XHL
+# Description:       Enable service provided by daemon.
+### END INIT INFO
+
+##
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+##
+
+# Location of pid file
+PIDFILE=/var/run/lsmonitor_daemon.pid
+LOGFILE=/var/log/lsmonitor.log
+
+# Control interfaces
+LED_DIR="/sys/devices/gpio_leds/leds"
+LINFO="lsxl:amber:info"
+LPOWER="lsxl:blue:power"
+LBFUNC="lsxl:blue:func"
+LAFUNC="lsxl:red:func"
+LALARM="lsxl:red:alarm"
+
+FAN_CTRL=/sys/bus/platform/drivers/gpio-fan/gpio_fan/hwmon/hwmon0
+FAN_TARGET=${FAN_CTRL}/fan1_target
+FAN_INPUT=${FAN_CTRL}/fan1_input
+
+INPUT=/dev/input/event0
+
+# Fan speeds
+SPEED_STOP=0
+SPEED_SLOW=1500
+SPEED_HIGH=3250
+SPEED_FULL=5000
+
+# HDD temperature limits for fancontrol
+HDDTEMP0=45
+HDDTEMP1=50
+HDDTEMP2=55
+
+USER_FUNCTION="/path/to/your/script/emergency.sh"
+USER_FUNCTION_ARGS="your_args_here"
+
+
+# logging
+do_log() {
+    [ -n "$LOGFILE" ] && echo "`date` $*" >> $LOGFILE
+}
+
+
+# Set and get current fan speed
+fan_speed() {
+    if [ $1 = "get" ]; then
+        cat $FAN_INPUT
+    elif [ $1 = "set" ]; then
+        echo $2 > $FAN_TARGET
+    fi
+}
+
+# set led state
+led_set() {
+  local LED=$1
+  local STATE=$2
+
+  if [ ! -e "$LED_DIR/$LED" ]; then
+    return
+  fi
+  case "$STATE" in
+    on)
+      echo default-on > $LED_DIR/$LED/trigger
+      ;;
+    blink)
+      echo timer > $LED_DIR/$LED/trigger
+      echo 500 > $LED_DIR/$LED/delay_on
+      echo 500 > $LED_DIR/$LED/delay_off
+      ;;
+    blink-fast)
+      echo timer > $LED_DIR/$LED/trigger
+      echo 100 > $LED_DIR/$LED/delay_on
+      echo 100 > $LED_DIR/$LED/delay_off
+      ;;
+    off)
+      echo none > $LED_DIR/$LED/trigger
+      ;;
+    *)
+      ;;
+  esac
+}
+
+# Get power switch state: on / off / auto
+get_power_switch_state() {
+    if [ -e $INPUT ]; then
+        evtest --query $INPUT EV_SW SW_LID
+        PWR=$?
+        evtest --query $INPUT EV_SW SW_TABLET_MODE
+        AUTO=$?
+
+        if [ $PWR -eq 0 -a $AUTO -eq 10 ]; then
+            do_log "detect switch in auto position"
+            echo auto
+        elif [ $PWR -eq 10 -a $AUTO -eq 0 ]; then
+            echo on
+        elif [ $PWR -eq 0 -a $AUTO -eq 0 ]; then
+            do_log "detect switch in off position"
+            echo off
+        fi
+    fi
+}
+
+
+# get the function button state: normal / pressed
+get_function_button_state() {
+    evtest --query $INPUT EV_KEY KEY_OPTION
+    RETVAL=$?
+
+    if [ "$RETVAL" -eq 0 ]; then
+        echo "normal"
+    elif [ "$RETVAL" -eq 10 ]; then
+        echo "pressed"
+    fi
+}
+
+
+# Monitor HDD temperature & control fan speed
+monitor_temperature()
+{
+    # Retrieve HDD temp
+    HDDTEMP=$(smartctl /dev/sda --all | awk '$1 == "194" {print $10}')
+
+    # Change fan speed accordingly
+    if [ $HDDTEMP -le $HDDTEMP0 ]; then
+        fan_speed set $SPEED_STOP
+    elif [ $HDDTEMP -le $HDDTEMP1 ]; then
+        fan_speed set $SPEED_SLOW
+    elif [ $HDDTEMP -le $HDDTEMP2 ]; then
+        fan_speed set $SPEED_HIGH
+    else
+        fan_speed set $SPEED_FULL
+    fi
+}
+
+
+# Monitor HDD status and deactivate power led if idle
+monitor_hdd()
+{
+    HDDSTATUS=$(hdparm -C /dev/sda | grep "standby")
+    if [ -z "$HDDSTATUS" ]; then
+        led_set $LBFUNC on
+        if [ $HDDSTATUSOLD -eq 0 ]; then
+            do_log "HDD active"
+            HDDSTATUSOLD=1
+        fi
+    else
+        led_set $LBFUNC off
+        if [ $HDDSTATUSOLD -eq 1 ]; then
+            do_log "HDD standby"
+            HDDSTATUSOLD=0
+        fi
+    fi
+}
+
+
+# Control LS switch status to power down the unit
+lsmonitor_daemon()
+{
+    COUNT=12
+    HDDSTATUSOLD=0
+
+    fan_speed set $SPEED_STOP
+
+    while [ true ]; do
+        # Check switch status
+        local PWR_SW=`get_power_switch_state`
+        case $PWR_SW in
+            off)
+                do_log "Initiating shutdown."
+                break;
+                ;;
+            auto)
+                # todo
+                ;;
+            *)
+                ;;
+        esac
+
+        local FUNC_BUTTON=`get_function_button_state`
+        case $FUNC_BUTTON in
+            normal)
+                # do nothing
+                ;;
+            pressed)
+                # amber led blink-fast while user function running
+                led_set $LPOWER off
+                led_set $LINFO blink-fast
+                do_log "function button was pressed"
+                if [ -x "$USER_FUNCTION" ]; then
+                    "$USER_FUNCTION" "$USER_FUNCTION_ARGS"
+                else
+                    do_log "no permission to execute user function $USER_FUNCTION"
+                fi
+                led_set $LINFO off
+                led_set $LPOWER on
+                do_log "user function $USER_FUNCTION returned $?"
+                ;;
+        esac
+
+        # Check HDD status
+        monitor_hdd
+
+        # Once per minute monitor HDD temperature
+        if [ $COUNT -eq 12 ]; then
+            COUNT=0
+            monitor_temperature
+        else
+            COUNT=$(( $COUNT + 1 ))
+        fi
+
+        sleep 5
+    done
+
+    # Run the fan at low speed while halting, just in case halt hangs the unit
+    fan_speed set $SPEED_LOW
+
+    # blink power led
+    led_set $LPOWER blink-fast
+
+    # Initiate unit shutdown
+    halt
+}
+
+# Kill the lsmonitor daemon
+kill_lsmonitor_daemon()
+{
+    PID=`cat $PIDFILE`
+    if [ "$PID" != "" ] ; then
+        kill $PID
+        rm $PIDFILE
+    fi
+}
+
+
+# Main
+EVTEST=$(which "evtest")
+if [ -z "$EVTEST" ]; then
+    echo "evtest not found in path, please install to monitor the power switch and the function button"
+    do_log "evtest not found in path, please install to monitor the power switch and the function button"
+    exit 1
+fi
+
+case $1 in
+    start)
+        # Start the lsmonitor daemon
+        do_log "starting ..."
+        lsmonitor_daemon &
+        echo $! > $PIDFILE
+        ;;
+    stop)
+        # Kill the lsmonitor daemon
+        do_log "stopping ..."
+        kill_lsmonitor_daemon
+        ;;
+    restart)
+        # restart means stop and start
+        do_log "restarting ..."
+        $0 stop && sleep 2 && $0 start
+        ;;
+    status)
+        # show the status running or not running
+        service lsmonitor status
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status}"
+        exit 2
+        ;;
+esac

@@ -1,0 +1,18 @@
+lsmonitor script for LS-CHL with debian
+
+Based on:
+ blstools  - Copyright (C) 2010 Michele Manzato
+ lsmonitor - Copyright (C) 2013 Sergej Wildemann
+
+Credits:
+ Thanks to archonfx on Buffalo NAS Central forum for HDD
+ temperature monitoring command.
+
+
+lsmonitor:
+- handle ls complete power-on
+- monitor hdd temperature & control fan speed
+- monitor hdd status & control function led
+- monitor power switch
+- monitor function button
+- handle pressed function button -> execute user defined script
