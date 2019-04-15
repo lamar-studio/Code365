@@ -1,7 +1,7 @@
 /*
  * decs: test for sysabslayer_linux cpp interface
  *
- * make: gcc -o test test_control.c -lsysabslayer_linux
+ * make: gcc -o test test_control.c -I/usr/loacl/include -L/usr/local/lib -lsysabslayer_linux
  * author: LaMar
  */
 
