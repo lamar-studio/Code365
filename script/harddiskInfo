@@ -12,12 +12,12 @@ curTemp=''
 
 devpath=`ls /sys/block/sd[a-z] -d 2>/dev/null`
 if [ -n "$devpath" ]; then
-    for path in `realpath $devpath  | grep -v -E "/usb[0-9]+/"`
+    for path in `realpath $devpath |grep -v -E "/usb[0-9]+/"`
     do
         devlist="$devlist `basename $path`"
     done
 else
-	echo 'Not found the hard disk device'
+	echo "not found the device path"
 	exit 1
 fi
 
@@ -27,23 +27,35 @@ if [ -n "$devlist" ]; then
         smartInfo=`smartctl --all /dev/$sdev`
         ret=$?
         if [ ! $ret -eq 0 ]; then
-            echo 'failed to run cmd: smartctl'
+            echo "failed to run cmd:smartctl"
+			exit 1;
         fi
-		buf=`echo -e "$smartInfo" | grep "Rotation Rate:" | tr -cd "[0-9]"`
+		buf=`echo -e "$smartInfo" |grep "Rotation Rate:" |tr -cd "[0-9]"`
 		if [ -n "$buf" ]; then
 			devType=HDD
 		else
 			devType=SSD
 		fi
-		totalWritten=`echo -e "$smartInfo" | grep ^241 | awk '$0=$NF'`
-		powerOnHours=`echo -e "$smartInfo" | grep ^"  "9 | awk '$0=$NF'`	
-		curTemp=`echo -e "$smartInfo" | grep ^194 | awk '{print $10}'`
 
-		[ -n "$devType" ] && echo devType_$sdev=$devType
-		[ -n "$totalWritten" ] && echo totalWritten_$sdev=$totalWritten
-		[ -n "$powerOnHours" ] && echo powerOnHours_$sdev=$powerOnHours
-		[ -n "$curTemp" ] && echo curTemp_$sdev=$curTemp
+		# avoid the format "20091h+46m+11.480s",just count the hours
+		buf=`echo -e "$smartInfo" |awk '$1 == "9" {print $10}'|awk -F'+' '{print $1}'`
+		res=`echo $buf | grep -e "m" -e "s"`
+		if [ -n "$res" ]; then
+			powerOnHours=0
+		else
+			powerOnHours=`echo -e "$buf" |tr -cd "[0-9]"`
+		fi
+
+		totalWritten=`echo -e "$smartInfo" |awk '$1 == "241" {print $10}'`
+		curTemp=`echo -e "$smartInfo" |awk '$1 == "194" {print $10}'`
+
+		[ -n "$sdev" ] && echo -n "$sdev|"               # the device mount point 
+		[ -n "$devType" ] && echo -n "devType=$devType;"
+		[ -n "$totalWritten" ] && echo -n "totalWritten=$totalWritten;"
+		[ -n "$powerOnHours" ] && echo -n "powerOnHours=$powerOnHours;"
+		[ -n "$curTemp" ] && echo "curTemp=$curTemp;"    # the last one must echo without '-n' option
     done
 	exit 0
 fi
+echo "not found the real device"
 exit 1
