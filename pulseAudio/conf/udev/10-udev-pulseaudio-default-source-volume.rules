@@ -1,0 +1,4 @@
+# the udev rules: 
+# run the script when detect the usb headset insert the system
+
+ACTION=="add", SUBSYSTEM=="sound", RUN+="/usr/local/bin/test.sh"
