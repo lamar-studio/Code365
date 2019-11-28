@@ -1,0 +1,14 @@
+[Unit]
+Description=PulseAudio Sound Server in root-user
+
+[Service]
+Type=forking
+Environment=DISPLAY=:0
+ExecStartPre=/bin/bash -c "[ ! -e /proc/asound/pcm ] && /sbin/modprobe snd_hda_intel && sleep 3; exit 0"
+ExecStart=/usr/bin/pulseaudio --start
+Restart=always
+RestartSec=1
+StartLimitInterval=0
+
+[Install]
+WantedBy=multi-user.target

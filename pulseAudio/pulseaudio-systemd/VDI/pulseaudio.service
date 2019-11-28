@@ -1,0 +1,14 @@
+[Unit]
+Description=PulseAudio Sound Server in root
+
+[Service]
+Type=forking
+Environment=DISPLAY=:0
+ExecStartPre=/bin/bash -c "while ! /bin/pidof Xorg 2&>1 >/dev/null; do sleep 1; done; exit 0"
+ExecStart=/usr/bin/pulseaudio --start
+Restart=always
+RestartSec=5
+StartLimitInterval=0
+
+[Install]
+WantedBy=multi-user.target

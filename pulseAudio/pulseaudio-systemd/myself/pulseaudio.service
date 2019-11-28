@@ -1,0 +1,15 @@
+[Unit]
+Description=PulseAudio Sound Server in root user
+Requires=pulseaudio.socket
+#ConditionUser=root
+#ConditionPathExists=/run/sshd.pid
+
+[Service]
+Type=forking
+Environment=DISPLAY=:0
+ExecStart=/usr/bin/pulseaudio --start
+Restart=on-failure
+
+[Install]
+Also=pulseaudio.socket
+WantedBy=default.target

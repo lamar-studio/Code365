@@ -1,0 +1,16 @@
+[Unit]
+Description=PulseAudio Sound Server in system-wide mode
+
+[Service]
+Type=forking
+PIDFile=/var/run/pulse/pid
+ExecStart=/usr/bin/pulseaudio --system --disallow-exit=1 \
+	--disable-shm=1 --fail=1 --daemonize
+ExecStartPost=/usr/sbin/alsactl -i /usr/share/alsa/init/pulsePost init
+ExecReload=/usr/sbin/alsactl -i /usr/share/alsa/init/pulsePost init
+Restart=always
+StartLimitInterval=0
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
