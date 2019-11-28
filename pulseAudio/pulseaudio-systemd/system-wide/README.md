@@ -6,8 +6,8 @@ Running pulseaudio in system-wide mode is generally a bad idea and shouldn't be 
 Read [this](http://www.freedesktop.org/wiki/Software/PulseAudio/Documentation/User/WhatIsWrongWithSystemWide) for more 
 information.
 
-Instructions
--------
+## Instructions
+```
 1. Clone the repository
 2. $ makepkg
 3. # pacman -U *.xz
@@ -15,8 +15,14 @@ Instructions
 5. # systemctl enable pulseaudio
 6. Disable pulseaudio autostarting by the Desktop Environment.
 7. Reboot
+```
 
 Credits
 -------
 Dmitry Fillo, Joseph Lehner
 
+
+Comment
+------
+This configuration seems to work only for archlinux, i can use it on Ubuntu.
+You can try it if you are interested.
