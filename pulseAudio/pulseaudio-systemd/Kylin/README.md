@@ -9,7 +9,7 @@ You can use it on Ubuntu. enjoy it
 Step
 -------
 
-## 添加如下脚本到preinst
+1. add follow cmd on the preinst
 ```
 getent group pulse &>/dev/null || groupadd -r pulse >/dev/null
 getent group pulse-access &>/dev/null || groupadd -r pulse-access >/dev/null
@@ -18,14 +18,14 @@ adduser <user> pulse-access
 adduser root pulse-access
 ```
 
-## pulse守护脚本
+2. pulse-systemd script
 ```
 cp pulsePost /usr/share/alsa/init
 cp pulseaudio.service /lib/systemd/system/
 systemctl enable pulseaudio
 ```
 
-## 按如下修改/etc/pulse/client.conf 文件
+3. disable the pulse default daemon
 ```
 autospawn = no
 daemon-binary = /usr/bin/pulse
