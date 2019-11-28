@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# README:
+# syssize unit(kB)  [1kB = 1000B]
+# datasize unit(kB) [1kB = 1000B]
+#
+hwcfg=/usr/local/bin/system/getHWCfg
+datapart=/opt/lessons
+
+if [ -e $hwcfg ];then
+  productid=`echo $(bash $hwcfg ID)`
+  productname=`echo $(bash $hwcfg NAME)`
+  platform=`echo $(bash $hwcfg PLAT)`
+else
+  productid=`echo $(dmidecode -s baseboard-product-name)`
+  productname=`echo $(dmidecode -s system-product-name)`
+fi  
+
+serialnum=`echo $(dmidecode -s system-serial-number)`
+hdversion=`echo $(dmidecode -s system-version)`
+biosversion=`echo $(dmidecode -s bios-version)`
+sysversion=`echo $(cat /etc/issue)`
+bit=`echo $(getconf LONG_BIT)`
+cpu=`echo $(cat /proc/cpuinfo | grep "^model\s*name\s*:" | uniq | cut -d: -f2)`
+# the memory unit [1kB=1024B]
+memory=`echo $(cat /proc/meminfo | grep "^MemTotal:" | cut -d: -f2 | sed 's/kB//g' | awk '{print int($1)/1024/1024}')`
+# memory should be the power of 2 (0.918 GB -> 1 GB)
+[ -n "$memory" ] && memory=`echo ${memory} | awk '{print 2**int(log($memory)/log(2)+0.5)}' | awk '{print int($1*1024*1024*1024)}'`
+
+sysblock=`echo $(df / | awk 'NR>1{print $1}' | sed -n -e 's/\/dev\///' -e 's/[0-9]*$// p')`
+[ -d $datapart ] && datablock=`echo $(df $datapart | awk 'NR>1{print $1}' | sed -n -e 's/\/dev\///' -e 's/[0-9]*$// p')`
+if [ "$sysblock" = "$datablock" ];then
+  [[ "$sysblock" =~ "mmcblk" ]] && sysblock=${sysblock%p}
+  datanum=`echo $(df $datapart | awk 'NR>1{print $1}' | sed -n -e 's/\/dev\/// p')`
+  if [ -f /sys/class/block/$sysblock/$datanum/size ];then 
+     datasize=`echo $(cat /sys/class/block/$sysblock/$datanum/size | awk '{print int($1*512)}')`
+     syssize=`echo $(expr $(cat /sys/class/block/$sysblock/size) - $(cat /sys/class/block/$sysblock/$datanum/size) | awk '{print int($1*512)}')`
+  fi
+else
+  [[ "$sysblock" =~ "mmcblk" ]] && sysblock=${sysblock%p}
+  [ -f /sys/class/block/$sysblock/size ] && syssize=`echo $(cat /sys/class/block/$sysblock/size | awk '{print int($1*512)}')`
+  [[ "$datablock" =~ "bcache" ]] && datablock=`echo bcache0` 
+  [ -f /sys/class/block/$datablock/size ] && datasize=`echo $(cat /sys/class/block/$datablock/size | awk '{print int($1*512)}')`
+fi
+
+# storage should be the power of 2 (31.8 GB -> 32 GB) when system not have the data part
+[ -n "$syssize" ] && [ -z "$datasize" ] && syssize=`echo ${syssize} | awk '{print 2**int(log($syssize)/log(2)+0.5)}'`
+
+[ -n "$serialnum" ] && echo serialnum=$serialnum
+[ -n "$productid" ] && echo productid=$productid
+[ -n "$productname" ] && echo productname=$productname
+[ -n "$platform" ] && echo platform=$platform
+[ -n "$hdversion" ] && echo hdversion=$hdversion
+[ -n "$biosversion" ] && echo biosversion=$biosversion
+[ -n "$sysversion" ] && echo sysversion=$sysversion
+[ -n "$bit" ] && echo bit=$bit
+[ -n "$cpu" ] && echo cpu=$cpu
+[ -n "$memory" ] && echo memory=$memory
+[ -n "$storage" ] && echo storage=$storage
+[ -n "$datasize" ] && echo datasize=$datasize
+[ -n "$syssize" ] && echo syssize=$syssize
+exit 0
