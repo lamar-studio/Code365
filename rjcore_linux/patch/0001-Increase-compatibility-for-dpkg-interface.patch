@@ -1,0 +1,60 @@
+From 340a37d985b180adeaa0bb0b3b7aff83c7eff0f1 Mon Sep 17 00:00:00 2001
+From: linzr <linzaorong@ruijie.com.cn>
+Date: Thu, 4 Jun 2020 14:42:46 +0800
+Subject: [PATCH] Increase compatibility for dpkg interface
+
+Change-Id: Ied28738e15be9f6a604f5eaba648e58fc7535398
+---
+ abslayer/interfaces/application/application.cpp | 27 ++++++++++++++++++++-----
+ 1 file changed, 22 insertions(+), 5 deletions(-)
+
+diff --git a/abslayer/interfaces/application/application.cpp b/abslayer/interfaces/application/application.cpp
+index c226981..adba9ac 100755
+--- a/abslayer/interfaces/application/application.cpp
++++ b/abslayer/interfaces/application/application.cpp
+@@ -118,6 +118,10 @@ int abslayer_installDebForceOverwrite_block(const char *debPath, const char *deb
+     char res[SIZE_1K] = {0};
+     char cmd[SIZE_1K] = {0};
+     char file[SIZE_1K] = {0};
++    char buf[SIZE_1K] = {0};
++    char front[SIZE_1K] = {0};
++    char rear[SIZE_1K] = {0};
++    string debs;
+ 
+     len = strlen(debPath);
+     if (debPath[len - 1] != '/') {
+@@ -125,13 +129,26 @@ int abslayer_installDebForceOverwrite_block(const char *debPath, const char *deb
+         return ERROR_11003;
+     }
+ 
+-    snprintf(file, sizeof(file), "%s%s", debPath, debName);
+-    if (access(file, F_OK) != 0) {
+-        rjlog_error("Not found file:%s", file);
+-        return ERROR_11000;
++    strncpy(buf, debName, strlen(debName));
++    while(1) {
++        sscanf(buf, "%s %[^\\$]", front, rear);
++        rjlog_info("string front:%s rear:%s", front, rear);
++        if (strlen(front) > 0) {
++            snprintf(file, sizeof(file), " %s%s", debPath, front);
++            debs += file;
++        }
++
++        if (strlen(rear) == 0) {
++            break;
++        }
++
++        memcpy(buf, rear, sizeof(buf));
++        memset(rear, 0, sizeof(rear));
++        memset(front, 0, sizeof(front));
++        memset(file, 0, sizeof(file));
+     }
+ 
+-    snprintf(cmd, sizeof(cmd), "dpkg -i --force-overwrite %s >/dev/null 2>&1; echo $?", file);
++    snprintf(cmd, sizeof(cmd), "dpkg -i --force-overwrite %s >/dev/null 2>&1; echo $?", debs.c_str());
+     rjlog_info("cmd:%s", cmd);
+     rj_exec_result(cmd, res, sizeof(res));
+     if (res[0] == '0') {
+-- 
+2.7.4
+
